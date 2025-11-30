@@ -1,23 +1,23 @@
-import {
-  CirclePlus,
-  Search,
-  Filter
-} from "lucide-react";
+import { CirclePlus, User } from "lucide-react";
 import { useState } from "react";
 import ModalAddProducts from "./sweetAlert/addProductModal";
 import { StatCards } from "./statCard/statCard";
 import { Table } from "./table/table";
+import { useAuth } from "./auth/authContext";
 
 
 export default function PanelVentas() {
-  const [sales, setSales] = useState([]);
-  const [query, setQuery] = useState("");
-  const [filterTipo, setFilterTipo] = useState<string>("Todos");
+  const { user, loading, logout } = useAuth();
+  const [sales] = useState([]);
+  const [openMenu, setOpenMenu] = useState(false);
 
 
 
-  const totalRevenue = sales.reduce((acc, s) => acc + 8, 0);
-
+  const totalRevenue = sales.reduce((acc,) => acc + 8, 0);
+  const handleSignOut = () => {
+    logout();
+    setOpenMenu(false);
+  };
 
 
 
@@ -30,7 +30,8 @@ export default function PanelVentas() {
       <div className="relative z-10 max-w-7xl mx-auto p-6">
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-10 text-white">
-          <div>
+          <div >
+
             <h1 className="text-4xl font-bold tracking-tight mb-2">STF Panel</h1>
             <p className="text-indigo-100 text-lg font-light">Panel de Control de Ventas</p>
           </div>
@@ -41,6 +42,16 @@ export default function PanelVentas() {
               <span className="text-2xl font-bold text-white">${totalRevenue.toLocaleString()}</span>
             </div>
             <ModalAddProducts onClose={() => console.log('cerro')} />
+            <p> {user?.displayName}</p>
+            <User size={24}
+              onClick={() => setOpenMenu(!openMenu)}
+            />
+            {openMenu && (
+              <div >
+                <button onClick={handleSignOut}> cerrar sesion </button>
+              </div>
+            )}
+
           </div>
         </header>
 
@@ -75,49 +86,9 @@ export default function PanelVentas() {
 
           {/* Right column: Table & Filters */}
           <main className="lg:col-span-3 space-y-6">
-            {/* Filters Bar */}
-            <div className="glass p-4 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg bg-white/90">
-              <div className="relative w-full md:w-96">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search size={18} className="text-slate-400" />
-                </div>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar por producto, cliente..."
-                  className="pl-10 pr-4 py-3 w-full bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="relative flex-1 md:flex-none">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Filter size={16} className="text-slate-400" />
-                  </div>
-                  <select
-                    value={filterTipo}
-                    onChange={(e) => setFilterTipo(e.target.value)}
-                    className="pl-10 pr-8 py-3 w-full bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer text-slate-600 font-medium"
-                  >
-                    <option>Todos</option>
-                    <option>Teléfono</option>
-                    <option>Línea</option>
-                    <option>Datos</option>
-                    <option>Otro</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => { setQuery(""); setFilterTipo("Todos"); }}
-                  className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-
 
             <Table />
+
 
           </main>
         </div>

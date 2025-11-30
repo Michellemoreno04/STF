@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, PlusCircle, Smartphone, Globe, Wifi, CirclePlus } from "lucide-react";
+import Swal from "sweetalert2";
 
 interface Option {
   id: string;
@@ -9,8 +10,11 @@ interface Option {
 
 const options: Option[] = [
   { id: "devices", label: "Add Devices", icon: <Smartphone className="w-5 h-5 text-indigo-500" /> },
-  { id: "lines", label: "Add Lines", icon: <Globe className="w-5 h-5 text-emerald-500" /> },
-  { id: "internet", label: "Add Internet Plans", icon: <Wifi className="w-5 h-5 text-purple-500" /> },
+  { id: "lines", label: "Lines", icon: <Globe className="w-5 h-5 text-emerald-500" /> },
+  { id: "internet", label: "Data add", icon: <Wifi className="w-5 h-5 text-purple-500" /> },
+  { id: "data", label: 'Asurion', icon: <Wifi className="w-5 h-5 text-purple-500" /> },
+  { id: "tv", label: 'Tv', icon: <Wifi className="w-5 h-5 text-purple-500" /> },
+  { id: "revenue", label: 'Upgrade or change of service', icon: <Wifi className="w-5 h-5 text-purple-500" /> },
 ];
 
 export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
@@ -33,12 +37,21 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
     setValues({});
     setSelectedOption(null);
     onClose();
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Success...',
+      text: 'Product added successfully!',
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+    });
   };
 
   return (
     <>
       <button
-        className="flex items-center gap-2 px-5 py-3 bg-white text-indigo-600 rounded-2xl shadow-lg hover:bg-indigo-50 hover:shadow-indigo-500/20 transition-all duration-300 font-semibold"
+        className="flex items-center gap-2 px-5 py-3 bg-white text-indigo-600 rounded-2xl shadow-lg hover:bg-indigo-50 hover:shadow-indigo-500/20 transition-all duration-300 font-semibold cursor-pointer"
         onClick={handleOpen}
       >
         <span>Add</span>
@@ -59,7 +72,7 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
               <div className="p-2 bg-indigo-100 rounded-xl">
                 <PlusCircle className="h-6 w-6 text-indigo-600" />
               </div>
-              Add Data
+              Add Product
             </h2>
 
             <div className="space-y-4">
@@ -67,8 +80,8 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
                 <div
                   key={opt.id}
                   className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${selectedOption === opt.id
-                      ? "border-indigo-500 bg-indigo-50/50 shadow-md"
-                      : "border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white"
+                    ? "border-indigo-500 bg-indigo-50/50 shadow-md"
+                    : "border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white"
                     }`}
                   onClick={() => toggleInput(opt.id)}
                 >
@@ -79,20 +92,76 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
                     <span className={`font-medium ${selectedOption === opt.id ? "text-indigo-900" : "text-slate-700"}`}>
                       {opt.label}
                     </span>
+                    {values[opt.id] && selectedOption !== opt.id && (
+                      <span className="ml-auto rounded-lg bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-600">
+                        {values[opt.id]}
+                      </span>
+                    )}
                   </div>
 
                   {selectedOption === opt.id && (
                     <div className="mt-4 animate-in slide-in-from-top-2 duration-200">
-                      <input
-                        type="number"
-                        placeholder="Enter amount..."
-                        value={values[opt.id] || ""}
-                        onClick={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.stopPropagation()}
-                        onChange={(e) => handleChange(opt.id, e.target.value)}
-                        className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800 placeholder:text-slate-400"
-                        autoFocus
-                      />
+                      {/* Lines & Devices: Quantity 1-5 */}
+                      {(opt.id === "lines" || opt.id === "devices") && (
+                        <select
+                          value={values[opt.id] || ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handleChange(opt.id, e.target.value)}
+                          className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
+                          autoFocus
+                        >
+                          <option value="" disabled>Select quantity</option>
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <option key={num} value={num}>{num}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Data Add (Internet): Speed Options */}
+                      {opt.id === "internet" && (
+                        <select
+                          value={values[opt.id] || ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handleChange(opt.id, e.target.value)}
+                          className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
+                          autoFocus
+                        >
+                          <option value="" disabled>Select speed</option>
+                          {["100mbps", "200mbps", "300mbps", "500mbps", "1gb", "2gb", "5g", "8gb"].map((speed) => (
+                            <option key={speed} value={speed}>{speed}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Asurion (Data): Insurance Types */}
+                      {opt.id === "data" && (
+                        <select
+                          value={values[opt.id] || ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handleChange(opt.id, e.target.value)}
+                          className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
+                          autoFocus
+                        >
+                          <option value="" disabled>Select plan</option>
+                          {["Total Care", "Plus", "Max"].map((plan) => (
+                            <option key={plan} value={plan}>{plan}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* TV & Revenue: Revenue Input */}
+                      {(opt.id === "tv" || opt.id === "revenue") && (
+                        <input
+                          type="number"
+                          placeholder="Enter revenue amount..."
+                          value={values[opt.id] || ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onFocus={(e) => e.stopPropagation()}
+                          onChange={(e) => handleChange(opt.id, e.target.value)}
+                          className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800 placeholder:text-slate-400"
+                          autoFocus
+                        />
+                      )}
                     </div>
                   )}
                 </div>

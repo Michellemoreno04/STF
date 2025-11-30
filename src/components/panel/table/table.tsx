@@ -1,4 +1,4 @@
-import { Calendar, Package } from "lucide-react";
+import { Calendar, Package, Search, Filter, X } from "lucide-react";
 import { MoreHorizontal } from "lucide-react";
 import { Smartphone } from "lucide-react";
 import { Wifi } from "lucide-react";
@@ -55,9 +55,10 @@ const sampleSales: Sale[] = [
 
 
 export const Table = () => {
-    const [sales, setSales] = useState<Sale[]>(sampleSales);
+    const [sales] = useState<Sale[]>(sampleSales);
     const [query, setQuery] = useState("");
     const [filterTipo, setFilterTipo] = useState("Todos");
+    const [filterDate, setFilterDate] = useState("");
 
     const ventasFiltradas = sales.filter((s) => {
         const matchesQuery = [s.producto, s.cliente, s.vendedor]
@@ -65,8 +66,14 @@ export const Table = () => {
             .toLowerCase()
             .includes(query.toLowerCase());
         const matchesTipo = filterTipo === "Todos" || s.tipo === filterTipo;
-        return matchesQuery && matchesTipo;
+
+        const matchesDate = filterDate
+            ? new Date(s.fecha).toLocaleDateString() === new Date(filterDate).toLocaleDateString()
+            : true;
+
+        return matchesQuery && matchesTipo && matchesDate;
     });
+
     const getStatusIcon = (tipo: string) => {
         switch (tipo) {
             case "Teléfono": return <Smartphone size={14} className="mr-1" />;
@@ -85,10 +92,63 @@ export const Table = () => {
         }
     };
 
-
-
     return (
         <div className="glass rounded-3xl shadow-xl overflow-hidden border border-white/50 bg-white/80">
+            {/* Filters Header */}
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex items-center gap-4 flex-1 min-w-[200px]">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por producto, cliente..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-600 placeholder:text-slate-400"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <select
+                            value={filterTipo}
+                            onChange={(e) => setFilterTipo(e.target.value)}
+                            className="appearance-none pl-4 pr-10 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-600 cursor-pointer hover:border-indigo-300"
+                        >
+                            <option value="Todos">Todos los tipos</option>
+                            <option value="Teléfono">Teléfonos</option>
+                            <option value="Línea">Líneas</option>
+                            <option value="Datos">Datos</option>
+                        </select>
+                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    </div>
+
+                    <div className="relative">
+                        <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            className="pl-4 pr-4 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-600 cursor-pointer hover:border-indigo-300"
+                        />
+                    </div>
+
+                    {(query || filterTipo !== "Todos" || filterDate) && (
+                        <button
+                            onClick={() => {
+                                setQuery("");
+                                setFilterTipo("Todos");
+                                setFilterDate("");
+                            }}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Limpiar filtros"
+                        >
+                            <X size={18} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -135,7 +195,20 @@ export const Table = () => {
                         ) : (
                             <tr>
                                 <td colSpan={7} className="p-12 text-center text-slate-400">
-                                    No se encontraron ventas que coincidan con los filtros.
+                                    <div className="flex flex-col items-center gap-2">
+                                        <Package size={32} className="text-slate-300" />
+                                        <p>No se encontraron ventas que coincidan con los filtros.</p>
+                                        <button
+                                            onClick={() => {
+                                                setQuery("");
+                                                setFilterTipo("Todos");
+                                                setFilterDate("");
+                                            }}
+                                            className="text-indigo-500 hover:text-indigo-600 text-sm font-medium"
+                                        >
+                                            Limpiar filtros
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         )}
