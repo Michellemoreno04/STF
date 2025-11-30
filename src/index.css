@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* Import Premium Font */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+}
+
+/* Glassmorphism Utility */
+.glass {
+  @apply bg-white/70 backdrop-blur-lg border border-white/20 shadow-xl;
+}
+
+.glass-dark {
+  @apply bg-slate-900/80 backdrop-blur-lg border border-white/10 shadow-xl;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full hover:bg-slate-400 transition-colors;
+}
+
+/* Popup */
+.swal-popup {
+    @apply rounded-3xl p-8 border border-white/50 shadow-2xl bg-white/90 backdrop-blur-xl;
+}
+  
+/* Title */
+.swal-title {
+    @apply text-3xl font-bold text-slate-800 tracking-tight;
+}
+  
+/* Buttons */
+.swal-confirm-btn {
+    @apply bg-indigo-600 text-white px-6 py-3 rounded-2xl font-medium hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200;
+}
+  
+.swal-cancel-btn {
+    @apply bg-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-medium hover:bg-slate-300 transition-all duration-200;
+}
+  
+/* Custom Input */
+.swal-input-custom {
+    @apply w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 bg-slate-50
+           focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 focus:outline-none transition-all;
+}
+  
+/* Cards */
+.swal-card {
+    @apply cursor-pointer p-5 rounded-2xl border border-slate-200 bg-white
+           hover:border-indigo-500 hover:shadow-indigo-100 hover:shadow-lg hover:-translate-y-1
+           transition-all duration-300 flex items-center justify-center;
+}
+  
+.swal-card-selected {
+    @apply border-indigo-600 bg-indigo-50/50 shadow-indigo-100 shadow-lg ring-2 ring-indigo-600 ring-offset-2;
+}
+  
+  
