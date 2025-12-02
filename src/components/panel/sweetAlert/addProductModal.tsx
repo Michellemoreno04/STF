@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { X, PlusCircle, Smartphone, Globe, Wifi, CirclePlus } from "lucide-react";
 import Swal from "sweetalert2";
+import { addDoc, collection, doc, setDoc, increment } from "firebase/firestore";
+import { db } from "../../../firebase";
+import { useAuth } from "../auth/authContext";
+
 
 interface Option {
   id: string;
@@ -18,6 +22,7 @@ const options: Option[] = [
 ];
 
 export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,20 +37,121 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
   const handleOpen = () => setIsModalOpen(true);
   const handleClose = () => setIsModalOpen(false);
 
-  const saveData = () => {
-    setIsModalOpen(false);
-    setValues({});
-    setSelectedOption(null);
-    onClose();
+  const saveData = async () => {
+    if (!user) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error...',
+        text: 'You must be logged in to add products!',
+      });
+      return;
+    }
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Success...',
-      text: 'Product added successfully!',
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 2000,
-    });
+    try {
+      // Determine product details based on selection
+      let product = "";
+      let quantity = 1;
+      let revenue = 0;
+      let type = "Otro";
+
+      switch (selectedOption) {
+        case "devices":
+          type = "Teléfono";
+          quantity = parseInt(values.devices || "1");
+          product = `${quantity} Device${quantity > 1 ? "s" : ""}`;
+          break;
+        case "lines":
+          type = "Línea";
+          quantity = parseInt(values.lines || "1");
+          product = `${quantity} Line${quantity > 1 ? "s" : ""}`;
+          break;
+        case "internet":
+          type = "Datos";
+          product = values.internet || "Internet Plan";
+          break;
+        case "data": // Asurion
+          type = "Otro";
+          product = values.data ? `Asurion ${values.data}` : "Asurion Plan";
+          break;
+        case "tv":
+          type = "Otro";
+          product = "TV Service";
+          revenue = parseFloat(values.tv || "0");
+          break;
+        case "revenue":
+          type = "Otro";
+          product = "Service Upgrade";
+          revenue = parseFloat(values.revenue || "0");
+          break;
+      }
+
+      const productData = {
+        userId: user.uid,
+        date: new Date().toISOString(),
+        category: selectedOption, // Keep original category for reference
+        type, // Mapped type for table
+        product,
+        quantity,
+        revenue,
+        status: "Completed",
+        ...values
+      };
+
+      await addDoc(collection(db, "users", user.uid, "products"), productData);
+
+      // Update user stats atomically for the current month
+      const date = new Date();
+      const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const userRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
+
+      const updateData: any = {};
+
+      const parseVal = (val: any) => {
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      if (selectedOption === 'lines') {
+        updateData.totalLines = increment(parseVal(values.lines));
+      } else if (selectedOption === 'devices') {
+        updateData.totalDevices = increment(parseVal(values.devices));
+      } else if (selectedOption === 'internet') {
+        updateData.totalInternet = increment(1);
+      } else if (selectedOption === 'data') { // Asurion
+        updateData.totalAsurion = increment(1);
+      } else if (selectedOption === 'tv') {
+        updateData.totalTv = increment(1);
+        updateData.totalRevenue = increment(parseVal(values.tv));
+      } else if (selectedOption === 'revenue') {
+        updateData.totalRevenue = increment(parseVal(values.revenue));
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        // Use setDoc with merge: true to create the document if it doesn't exist
+        await setDoc(userRef, updateData, { merge: true });
+      }
+
+      setIsModalOpen(false);
+      onClose();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Success...',
+        text: 'Product added successfully!',
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2000,
+      });
+      setValues({});
+      setSelectedOption(null);
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error...',
+        text: 'Product not added!',
+      });
+    }
   };
 
   return (
@@ -170,7 +276,7 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
 
             <button
               onClick={saveData}
-              className="mt-8 w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200"
+              className="mt-8 w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
             >
               Save Changes
             </button>

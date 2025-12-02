@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, OAuthProvider } from "firebase/auth";
+import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,6 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+});
 export const microsoftProvider = new OAuthProvider('microsoft.com');
 
 // Optional: Specify tenant if needed (common for enterprise apps)

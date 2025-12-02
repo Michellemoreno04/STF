@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { auth, microsoftProvider } from '../../../firebase';
+import { auth, microsoftProvider, db } from '../../../firebase';
 import { signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 const Login: React.FC = () => {
@@ -15,6 +16,19 @@ const Login: React.FC = () => {
             // The signed-in user info.
             const user = result.user;
             console.log("User signed in:", user);
+
+            // Save/Update user info in Firestore
+            const userRef = doc(db, "users", user.uid);
+            await setDoc(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                lastLogin: serverTimestamp(),
+            }, { merge: true });
+
+            console.log("User info saved to DB");
+
             // I can access the Microsoft Access Token if needed:
             // const credential = OAuthProvider.credentialFromResult(result);
             // const accessToken = credential?.accessToken;

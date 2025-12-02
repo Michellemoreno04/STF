@@ -1,4 +1,4 @@
-import { CirclePlus, User } from "lucide-react";
+import { CirclePlus, CircleUserRound } from "lucide-react";
 import { useState } from "react";
 import ModalAddProducts from "./sweetAlert/addProductModal";
 import { StatCards } from "./statCard/statCard";
@@ -7,13 +7,11 @@ import { useAuth } from "./auth/authContext";
 
 
 export default function PanelVentas() {
-  const { user, loading, logout } = useAuth();
-  const [sales] = useState([]);
+  const { user, logout } = useAuth();
   const [openMenu, setOpenMenu] = useState(false);
 
 
 
-  const totalRevenue = sales.reduce((acc,) => acc + 8, 0);
   const handleSignOut = () => {
     logout();
     setOpenMenu(false);
@@ -29,7 +27,7 @@ export default function PanelVentas() {
 
       <div className="relative z-10 max-w-7xl mx-auto p-6">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-10 text-white">
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-5 text-white">
           <div >
 
             <h1 className="text-4xl font-bold tracking-tight mb-2">STF Panel</h1>
@@ -37,13 +35,13 @@ export default function PanelVentas() {
           </div>
 
           <div className="flex items-center gap-4 mt-6 md:mt-0">
-            <div className="glass px-6 py-3 rounded-2xl flex flex-col items-end border-0 bg-white/10 backdrop-blur-md">
+            {/* <div className="glass px-6 py-3 rounded-2xl flex flex-col items-end border-0 bg-white/10 backdrop-blur-md">
               <span className="text-indigo-600  text-xs font-medium uppercase tracking-wider">Revenue Total</span>
               <span className="text-2xl font-bold text-white">${totalRevenue.toLocaleString()}</span>
-            </div>
-            <ModalAddProducts onClose={() => console.log('cerro')} />
+            </div> */}
+            <ModalAddProducts onClose={() => console.log('cerrado')} />
             <p> {user?.displayName}</p>
-            <User size={24}
+            <CircleUserRound size={24}
               onClick={() => setOpenMenu(!openMenu)}
             />
             {openMenu && (
