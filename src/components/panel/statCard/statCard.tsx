@@ -18,7 +18,8 @@ export const StatCards = () => {
         internet: 0,
         asurion: 0,
         tv: 0,
-        revenue: 0
+        revenue: 0,
+        phone: 0
     });
 
     useEffect(() => {
@@ -38,6 +39,7 @@ export const StatCards = () => {
                     asurion: data.totalAsurion || 0,
                     tv: data.totalTv || 0,
                     revenue: data.totalRevenue || 0,
+                    phone: data.totalPhone || 0,
                 });
             } else {
                 // If document doesn't exist (new month), reset stats to 0
@@ -47,7 +49,8 @@ export const StatCards = () => {
                     internet: 0,
                     asurion: 0,
                     tv: 0,
-                    revenue: 0
+                    revenue: 0,
+                    phone: 0
                 });
             }
         });
@@ -94,6 +97,12 @@ export const StatCards = () => {
                 <StatCard
                     title="Revenue"
                     value={`$${stats.revenue.toFixed(2)}`}
+                    icon={<CircleDollarSign className="text-white" size={18} />}
+                    color="bg-gradient-to-br from-emerald-400 to-teal-500"
+                />
+                <StatCard
+                    title="Phone"
+                    value={stats.phone.toString()}
                     icon={<CircleDollarSign className="text-white" size={18} />}
                     color="bg-gradient-to-br from-emerald-400 to-teal-500"
                 />

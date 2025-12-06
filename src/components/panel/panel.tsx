@@ -19,7 +19,6 @@ export default function PanelVentas() {
 
 
 
-
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans text-slate-900">
       {/* Background Decoration */}
@@ -27,14 +26,14 @@ export default function PanelVentas() {
 
       <div className="relative z-10 max-w-7xl mx-auto p-6">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-5 text-white">
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-3 text-white">
           <div >
 
-            <h1 className="text-4xl font-bold tracking-tight mb-2">STF Panel</h1>
-            <p className="text-indigo-100 text-lg font-light">Panel de Control de Ventas</p>
+            <h1 className="text-4xl font-bold tracking-tight mb-1">STF Panel</h1>
+            <p className="text-indigo-100 text-lg font-light">Welcome back! {user?.displayName}</p>
           </div>
 
-          <div className="flex items-center gap-4 mt-6 md:mt-0">
+          <div className="flex items-center gap-4 mt-4 md:mt-0">
             {/* <div className="glass px-6 py-3 rounded-2xl flex flex-col items-end border-0 bg-white/10 backdrop-blur-md">
               <span className="text-indigo-600  text-xs font-medium uppercase tracking-wider">Revenue Total</span>
               <span className="text-2xl font-bold text-white">${totalRevenue.toLocaleString()}</span>

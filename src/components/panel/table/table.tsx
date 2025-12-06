@@ -11,7 +11,7 @@ import { useAuth } from "../auth/authContext";
 type Sale = {
     id: string;
     fecha: string; // ISO
-    tipo: "Datos" | "Teléfono" | "Línea" | "Otro";
+    tipo: "Data" | "Devices" | "Line" | "Other";
     producto: string;
     cantidad: number;
     precioUnitario: number;
