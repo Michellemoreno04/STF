@@ -4,6 +4,7 @@ import ModalAddProducts from "./sweetAlert/addProductModal";
 import { StatCards } from "./statCard/statCard";
 import { Table } from "./table/table";
 import { useAuth } from "./auth/authContext";
+import { Link } from "react-router-dom"
 
 
 export default function PanelVentas() {
@@ -30,7 +31,9 @@ export default function PanelVentas() {
           <div >
 
             <h1 className="text-4xl font-bold tracking-tight mb-1">STF Panel</h1>
-            <p className="text-indigo-100 text-lg font-light">Welcome back! {user?.displayName}</p>
+            <p className="text-indigo-100 flex flex-row text-lg font-light">Welcome back-
+              <p className="text-white font-bold">{user?.displayName}</p>
+            </p>
           </div>
 
           <div className="flex items-center gap-4 mt-4 md:mt-0">
@@ -39,13 +42,14 @@ export default function PanelVentas() {
               <span className="text-2xl font-bold text-white">${totalRevenue.toLocaleString()}</span>
             </div> */}
             <ModalAddProducts onClose={() => console.log('cerrado')} />
-            <p> {user?.displayName}</p>
+
             <CircleUserRound size={24}
               onClick={() => setOpenMenu(!openMenu)}
+              className="cursor-pointer"
             />
             {openMenu && (
               <div >
-                <button onClick={handleSignOut}> cerrar sesion </button>
+                <button onClick={handleSignOut} className="cursor-pointer hover:text-indigo-600 transition-colors"> cerrar sesion </button>
               </div>
             )}
 
@@ -65,14 +69,11 @@ export default function PanelVentas() {
                 Quick Actions
               </h3>
               <ul className="space-y-3 text-sm text-slate-600">
-                <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
+                <Link to="/previous-months" className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
                   <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                  Last month report
-                </li>
-                <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
-                  <span className="w-2 h-2 rounded-full bg-pink-400"></span>
-                  Inventory management
-                </li>
+                  Last month view
+                </Link>
+
                 <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                   Sales performance

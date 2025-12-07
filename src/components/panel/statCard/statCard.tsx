@@ -71,14 +71,14 @@ export const StatCards = () => {
                     value={stats.lines.toString()}
                     icon={<TrendingUp className="text-white" size={18} />}
                     color="bg-gradient-to-br from-pink-500 to-rose-500"
-                    goal="pending..."
+                    goal="Mobile yield 3% a 4%"
                 />
                 <StatCard
                     title="Devices"
                     value={stats.devices.toString()}
                     icon={<Smartphone className="text-white" size={18} />}
                     color="bg-gradient-to-br from-indigo-500 to-blue-500"
-                    goal="pending..."
+                    goal="Mobile yield 3% a 4%"
                 />
                 <StatCard
                     title="Data add"
@@ -105,7 +105,10 @@ export const StatCards = () => {
                     value={`$${stats.revenue.toFixed(2)}`}
                     icon={<CircleDollarSign className="text-white" size={18} />}
                     color="bg-gradient-to-br from-emerald-400 to-teal-500"
-                    goal="1% or 2% of the total revenue"
+                    goal={<>
+                        1% or 2% <br />of the total revenue
+
+                    </>}
                 />
                 <StatCard
                     title="Phone"
