@@ -54,7 +54,7 @@ export default function PanelVentas() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Left column: Stats & Info */}
-          <aside className="lg:col-span-1 space-y-6">
+          <aside className="lg:col-span-1 space-y-6 relative z-20">
             {/* Stats Grid */}
             <StatCards />
 
@@ -62,20 +62,20 @@ export default function PanelVentas() {
             <div className="glass p-6 rounded-3xl border border-white/60 shadow-lg bg-white/80">
               <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                 <CirclePlus size={18} className="text-indigo-600" />
-                Acciones Rápidas
+                Quick Actions
               </h3>
               <ul className="space-y-3 text-sm text-slate-600">
                 <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
                   <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                  Exportar reporte mensual
+                  Last month report
                 </li>
                 <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
                   <span className="w-2 h-2 rounded-full bg-pink-400"></span>
-                  Gestionar inventario
+                  Inventory management
                 </li>
                 <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  Ver rendimiento de vendedores
+                  Sales performance
                 </li>
               </ul>
             </div>

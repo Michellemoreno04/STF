@@ -18,7 +18,7 @@ const options: Option[] = [
   { id: "internet", label: "Data add", icon: <WifiPen className="w-5 h-5 text-purple-500" /> },
   { id: "data", label: 'Asurion', icon: <Shield className="w-5 h-5 text-purple-500" /> },
   { id: "tv", label: 'Tv', icon: <Tv className="w-5 h-5 text-purple-500" /> },
-  { id: "revenue", label: 'Upgrade or change of service', icon: <SquarePen className="w-5 h-5 text-purple-500" /> },
+  { id: "revenue", label: 'Upgrade or change of svc', icon: <SquarePen className="w-5 h-5 text-purple-500" /> },
   { id: "Phone", label: 'Phone', icon: <Phone className="w-5 h-5 text-purple-500" /> },
 ];
 
@@ -89,38 +89,38 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
 
         switch (optionId) {
           case "devices":
-            type = "Teléfono";
+            type = "Devices";
             quantity = parseInt(values.devices || "1");
             product = `${quantity} Device${quantity > 1 ? "s" : ""}`;
             updateData.totalDevices = increment(quantity);
             break;
           case "lines":
-            type = "Línea";
+            type = "Líne";
             quantity = parseInt(values.lines || "1");
             product = `${quantity} Line${quantity > 1 ? "s" : ""}`;
             updateData.totalLines = increment(quantity);
             break;
           case "internet":
-            type = "Datos";
+            type = "Data add";
             product = values.internet || "Internet Plan";
             updateData.totalInternet = increment(1);
             break;
           case "data": // Asurion
-            type = "Otro";
+            type = "Others";
             product = values.data ? `Asurion ${values.data}` : "Asurion Plan";
             updateData.totalAsurion = increment(1);
             break;
           case "tv":
-            type = "Otro";
+            type = "Others";
             product = "TV Service";
             updateData.totalTv = increment(1);
             break;
           case "revenue":
-            type = "Otro";
+            type = "Others";
             product = "Service Upgrade";
             break;
           case "Phone":
-            type = "Otro";
+            type = "Landline";
             product = "Phone Service";
             updateData.totalPhone = increment(1);
             break;

@@ -277,12 +277,8 @@ export const Table = () => {
             {/* Table Footer */}
             <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-sm text-slate-500 shrink-0">
                 <span>Mostrando {ventasFiltradas.length} resultados</span>
-                <div className="flex items-center gap-2">
-                    <span>Total en vista:</span>
-                    <span className="font-bold text-slate-800 text-lg">
-                        ${ventasFiltradas.reduce((acc, r) => acc + r.revenue, 0).toFixed(2)}
-                    </span>
-                </div>
+
+
             </div>
         </div>
     );
