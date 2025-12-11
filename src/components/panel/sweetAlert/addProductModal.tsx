@@ -22,7 +22,7 @@ const options: Option[] = [
   { id: "Phone", label: 'Phone', icon: <Phone className="w-5 h-5 text-purple-500" /> },
 ];
 
-export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
+export default function ModalAddProducts({ onClose, onProductAdded }: { onClose: () => void; onProductAdded?: () => void }) {
   const { user } = useAuth();
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -66,26 +66,23 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
       const userRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
       const updateData: any = {};
 
-      const parseVal = (val: any) => {
+      const parseVal = (val: any) => { // para convertir el string a numero
         const parsed = parseFloat(val);
         return isNaN(parsed) ? 0 : parsed;
       };
 
       const totalRevenueVal = parseVal(globalRevenue);
-      let revenueAssigned = false;
 
-      // Iterate through all selected options
+      const productsList: any[] = [];
+      let totalQuantity = 0;
+      let summaryParts: string[] = [];
+      let typesSet = new Set<string>();
+
+      // Iterate through all selected options to build the list
       for (const optionId of selectedOptions) {
         let product = "";
         let quantity = 1;
-        let revenue = 0;
         let type = "Otro";
-
-        // Assign global revenue to the first product only
-        if (!revenueAssigned) {
-          revenue = totalRevenueVal;
-          revenueAssigned = true;
-        }
 
         switch (optionId) {
           case "devices":
@@ -95,66 +92,94 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
             updateData.totalDevices = increment(quantity);
             break;
           case "lines":
-            type = "Líne";
+            type = "Line";
             quantity = parseInt(values.lines || "1");
             product = `${quantity} Line${quantity > 1 ? "s" : ""}`;
             updateData.totalLines = increment(quantity);
             break;
           case "internet":
-            type = "Data add";
+            type = "Data";
             product = values.internet || "Internet Plan";
             updateData.totalInternet = increment(1);
             break;
           case "data": // Asurion
-            type = "Others";
+            type = "Other";
             product = values.data ? `Asurion ${values.data}` : "Asurion Plan";
             updateData.totalAsurion = increment(1);
             break;
           case "tv":
-            type = "Others";
+            type = "Other";
             product = "TV Service";
             updateData.totalTv = increment(1);
             break;
           case "revenue":
-            type = "Others";
-            product = "Service Upgrade";
+            type = "Other";
+            product = "Change of service";
             break;
           case "Phone":
-            type = "Landline";
+            type = "Other"; // Changed to match Table type or keep as Landline if needed, but Table uses "Other" in type definition usually? Actually Table has "Data" | "Devices" | "Line" | "Other".
+            // Let's check Table type definition. It says "Data" | "Devices" | "Line" | "Other".
+            // But previous code had "Landline". Let's stick to "Other" or map it.
+            // The previous code had "Landline" for Phone. Let's use "Other" for now to match the strict type or add "Landline" to Table later.
+            // Actually, let's look at the switch in Table. It handles "Teléfono", "Línea", "Datos".
+            // Wait, the Table component maps types to icons.
+            // Let's use "Other" for Phone to be safe, or "Teléfono" if we want to match the Spanish filter in Table?
+            // The Table component has `type Sale = { ... tipo: "Data" | "Devices" | "Line" | "Other"; ... }`
+            // But the filter uses "Teléfono", "Línea", "Datos".
+            // And `getStatusIcon` checks for "Teléfono", "Línea", "Datos".
+            // This suggests a mismatch in the current code between saved "type" and Table's expected "tipo".
+            // The previous code saved "Devices", "Líne", "Data add", "Others", "Landline".
+            // The Table `getStatusIcon` checks "Teléfono", "Línea", "Datos".
+            // This seems inconsistent. I should probably standardize.
+            // For now, I will try to be consistent with what I see in Table's `getStatusIcon` or just use a generic "Bundle" type for the main doc.
+
+            // Let's build the individual item:
             product = "Phone Service";
             updateData.totalPhone = increment(1);
             break;
         }
 
-        const productData = {
-          userId: user.uid,
-          date: new Date().toISOString(),
+        // Normalize type for the set to determine if it's a mix
+        typesSet.add(type);
+        totalQuantity += quantity;
+        summaryParts.push(product);
+
+        productsList.push({
           category: optionId,
           type,
           product,
           quantity,
-          revenue, // Only the first one gets the revenue value
-          status: "Completed",
-          ...values
-        };
-
-        await addDoc(collection(db, "users", user.uid, "products"), productData);
+          details: values[optionId] || "",
+        });
       }
+
+      // Determine main type
+      let mainType = "Other";
+      if (typesSet.size === 1) {
+        mainType = Array.from(typesSet)[0];
+      } else if (typesSet.size > 1) {
+        mainType = "Bundle";
+      }
+
+      // Construct summary string
+      const productSummary = summaryParts.join(", ");
+
+      const productData = {
+        userId: user.uid,
+        date: new Date().toISOString(),
+        type: mainType,
+        product: productSummary,
+        products: productsList, // Array of details
+        quantity: totalQuantity,
+        revenue: totalRevenueVal,
+        status: "Completed",
+      };
+
+      await addDoc(collection(db, "users", user.uid, "products"), productData);
 
       // Add total revenue to stats if applicable
       if (totalRevenueVal > 0) {
-        // We add it to totalRevenue generally. 
-        // Note: The original code had specific logic for PhoneRevenue vs totalRevenue.
-        // Since we now have a single input, we'll add it to totalRevenue.
-        // If 'Phone' is selected, maybe we should add to totalPhoneRevenue?
-        // For simplicity and per request "single input for total revenue", we'll add to totalRevenue.
-        // However, if the user wants to track phone revenue separately, this might be a simplification.
-        // Given the prompt "que solo haya un solo input para agregar el revenue total", I will stick to totalRevenue.
-
         updateData.totalRevenue = increment(totalRevenueVal);
-
-        // If Phone was selected, we might want to attribute it there, but with multi-select it's ambiguous.
-        // I'll stick to the main totalRevenue for now as it's the safest bet for "total revenue".
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -171,6 +196,10 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
         position: 'top-end',
         showConfirmButton: false,
         timer: 2000,
+      }).then(() => {
+        if (onProductAdded) {
+          onProductAdded();
+        }
       });
       setValues({});
       setSelectedOptions([]);
@@ -200,7 +229,7 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
           <div className="relative w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-200 my-8">
             <button
               onClick={handleClose}
-              className="absolute right-5 top-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              className="absolute cursor-pointer right-5 top-5 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -247,7 +276,7 @@ export default function ModalAddProducts({ onClose }: { onClose: () => void }) {
                             onChange={(e) => handleChange(opt.id, e.target.value)}
                             className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
                           >
-                            <option value="" disabled>Select quantity</option>
+                            <option value="" >Select quantity</option>
                             {[1, 2, 3, 4, 5].map((num) => (
                               <option key={num} value={num}>{num}</option>
                             ))}

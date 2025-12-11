@@ -4,7 +4,8 @@ import { Smartphone } from "lucide-react";
 import { Wifi } from "lucide-react";
 import { TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, where, deleteDoc, doc, getDoc, increment, writeBatch } from "firebase/firestore";
+import Swal from "sweetalert2";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
 
@@ -16,11 +17,10 @@ type Sale = {
     cantidad: number;
     precioUnitario: number;
     revenue: number;
-    cliente?: string;
-    vendedor?: string;
+
 };
 
-export const Table = () => {
+export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) => {
     const { user } = useAuth();
     const [sales, setSales] = useState<Sale[]>([]);
     const [queryText, setQueryText] = useState("");
@@ -79,8 +79,7 @@ export const Table = () => {
                     cantidad: data.quantity || 1,
                     precioUnitario: data.quantity ? (Number(data.revenue) || 0) / data.quantity : 0,
                     revenue: Number(data.revenue) || 0,
-                    cliente: data.clientName || "N/A",
-                    vendedor: "You",
+
                 };
             });
             setSales(salesData);
@@ -92,7 +91,7 @@ export const Table = () => {
 
     // Client-side filtering for other fields
     const ventasFiltradas = sales.filter((s) => {
-        const matchesQuery = [s.producto, s.cliente, s.vendedor]
+        const matchesQuery = [s.producto]
             .join(" ")
             .toLowerCase()
             .includes(queryText.toLowerCase());
@@ -111,11 +110,143 @@ export const Table = () => {
         setLimitCount((prev) => prev + 10);
     };
 
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (activeMenuId && !(event.target as Element).closest('.action-menu-container')) {
+                setActiveMenuId(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [activeMenuId]);
+
+    const handleDelete = async (sale: Sale) => {
+        setActiveMenuId(null); // Close menu
+
+        const result = await Swal.fire({
+            title: '¿Estás seguro?',
+            text: "No podrás revertir esta acción y se descontará de tus estadísticas.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#4f46e5', // Indigo 600
+            cancelButtonColor: '#ef4444', // Red 500
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+            background: '#fff',
+            customClass: {
+                popup: 'rounded-3xl',
+                confirmButton: 'rounded-xl px-6 py-2.5 font-medium',
+                cancelButton: 'rounded-xl px-6 py-2.5 font-medium'
+            }
+        });
+
+        if (result.isConfirmed) {
+            try {
+                if (!user) return;
+
+                const productRef = doc(db, "users", user.uid, "products", sale.id);
+                const productSnap = await getDoc(productRef);
+
+                if (!productSnap.exists()) {
+                    throw new Error("Document does not exist");
+                }
+
+                const productData = productSnap.data();
+                const productsList = productData.products || [];
+                const revenue = productData.revenue || 0;
+                const date = new Date(productData.date);
+                const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const statsRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
+
+                const batch = writeBatch(db);
+
+                // Calculate decrements
+                let decLines = 0;
+                let decDevices = 0;
+                let decInternet = 0;
+                let decAsurion = 0;
+                let decTv = 0;
+                let decPhone = 0;
+
+                productsList.forEach((p: any) => {
+                    switch (p.category) {
+                        case 'lines':
+                            decLines += p.quantity || 0;
+                            break;
+                        case 'devices':
+                            decDevices += p.quantity || 0;
+                            break;
+                        case 'internet':
+                            decInternet += 1;
+                            break;
+                        case 'data': // Asurion
+                            decAsurion += 1;
+                            break;
+                        case 'tv':
+                            decTv += 1;
+                            break;
+                        case 'Phone':
+                            decPhone += 1;
+                            break;
+                    }
+                });
+
+                // Update stats
+                batch.set(statsRef, {
+                    totalLines: increment(-decLines),
+                    totalDevices: increment(-decDevices),
+                    totalInternet: increment(-decInternet),
+                    totalAsurion: increment(-decAsurion),
+                    totalTv: increment(-decTv),
+                    totalPhone: increment(-decPhone),
+                    totalRevenue: increment(-revenue)
+                }, { merge: true });
+
+                // Delete product
+                batch.delete(productRef);
+
+                await batch.commit();
+
+                Swal.fire({
+                    title: '¡Eliminado!',
+                    text: 'El registro ha sido eliminado y las estadísticas actualizadas.',
+                    icon: 'success',
+                    confirmButtonColor: '#4f46e5',
+                    customClass: {
+                        popup: 'rounded-3xl',
+                        confirmButton: 'rounded-xl px-6 py-2.5 font-medium'
+                    }
+                }).then(() => {
+                    if (onProductDeleted) {
+                        onProductDeleted();
+                    }
+                });
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema al eliminar el registro.',
+                    icon: 'error',
+                    confirmButtonColor: '#4f46e5',
+                    customClass: {
+                        popup: 'rounded-3xl',
+                        confirmButton: 'rounded-xl px-6 py-2.5 font-medium'
+                    }
+                });
+            }
+        }
+    };
+
     const getStatusIcon = (tipo: string) => {
         switch (tipo) {
             case "Teléfono": return <Smartphone size={14} className="mr-1" />;
             case "Línea": return <Wifi size={14} className="mr-1" />;
             case "Datos": return <TrendingUp size={14} className="mr-1" />;
+            case "Bundle": return <Package size={14} className="mr-1" />;
             default: return <Package size={14} className="mr-1" />;
         }
     };
@@ -125,6 +256,7 @@ export const Table = () => {
             case "Teléfono": return "bg-blue-100 text-blue-700 border-blue-200";
             case "Línea": return "bg-emerald-100 text-emerald-700 border-emerald-200";
             case "Datos": return "bg-purple-100 text-purple-700 border-purple-200";
+            case "Bundle": return "bg-indigo-100 text-indigo-700 border-indigo-200";
             default: return "bg-gray-100 text-gray-700 border-gray-200";
         }
     };
@@ -220,14 +352,34 @@ export const Table = () => {
                                     </td>
                                     <td className="p-5">
                                         <div className="font-semibold text-slate-800">{s.producto}</div>
-                                        {s.cliente && <div className="text-xs text-slate-400 mt-0.5">{s.cliente}</div>}
                                     </td>
                                     <td className="p-5 text-right font-medium text-slate-600">{s.cantidad}</td>
                                     <td className="p-5 text-right font-bold text-slate-800">${s.revenue.toFixed(2)}</td>
-                                    <td className="p-5 text-center">
-                                        <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                    <td className="p-5 text-center relative action-menu-container">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuId(activeMenuId === s.id ? null : s.id);
+                                            }}
+                                            className={`p-2 rounded-lg transition-all ${activeMenuId === s.id ? 'text-indigo-600 bg-indigo-100 opacity-100' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 opacity-0 group-hover:opacity-100'}`}
+                                        >
                                             <MoreHorizontal size={18} />
                                         </button>
+
+                                        {activeMenuId === s.id && (
+                                            <div className="absolute right-8 top-1/2 -translate-y-1/2 w-32 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(s);
+                                                    }}
+                                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                                >
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        )}
                                     </td>
                                 </tr>
                             ))

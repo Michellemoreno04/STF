@@ -1,62 +1,19 @@
 import { TrendingUp, Tv, CircleDollarSign, Shield, Database, Smartphone, AlertCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { db } from "../../../firebase";
-import { doc, onSnapshot } from "firebase/firestore";
-import { useAuth } from "../auth/authContext";
 
 
 
 
+export interface Stats {
+    lines: number;
+    devices: number;
+    internet: number;
+    asurion: number;
+    tv: number;
+    revenue: number;
+    phone: number;
+}
 
-
-
-export const StatCards = () => {
-    const { user } = useAuth();
-    const [stats, setStats] = useState({
-        lines: 0,
-        devices: 0,
-        internet: 0,
-        asurion: 0,
-        tv: 0,
-        revenue: 0,
-        phone: 0
-    });
-
-    useEffect(() => {
-        if (!user) return;
-
-        const date = new Date();
-        const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const userRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
-
-        const unsubscribe = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setStats({
-                    lines: data.totalLines || 0,
-                    devices: data.totalDevices || 0,
-                    internet: data.totalInternet || 0,
-                    asurion: data.totalAsurion || 0,
-                    tv: data.totalTv || 0,
-                    revenue: data.totalRevenue || 0,
-                    phone: data.totalPhone || 0,
-                });
-            } else {
-                // If document doesn't exist (new month), reset stats to 0
-                setStats({
-                    lines: 0,
-                    devices: 0,
-                    internet: 0,
-                    asurion: 0,
-                    tv: 0,
-                    revenue: 0,
-                    phone: 0
-                });
-            }
-        });
-
-        return () => unsubscribe();
-    }, [user]);
+export const StatCards = ({ stats }: { stats: Stats }) => {
 
     return (
         <div >
@@ -65,7 +22,7 @@ export const StatCards = () => {
                     Current Month of {new Date().toLocaleString('en-US', { month: 'long' })}
                 </h2>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
                 <StatCard
                     title="Lines sold"
                     value={stats.lines.toString()}
@@ -105,10 +62,7 @@ export const StatCards = () => {
                     value={`$${stats.revenue.toFixed(2)}`}
                     icon={<CircleDollarSign className="text-white" size={18} />}
                     color="bg-gradient-to-br from-emerald-400 to-teal-500"
-                    goal={<>
-                        1% or 2% <br />of the total revenue
-
-                    </>}
+                    goal='$10 Per call'
                 />
                 <StatCard
                     title="Phone"
