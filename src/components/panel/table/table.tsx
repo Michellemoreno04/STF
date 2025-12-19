@@ -4,7 +4,7 @@ import { Smartphone } from "lucide-react";
 import { Wifi } from "lucide-react";
 import { TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, where, deleteDoc, doc, getDoc, increment, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, where, doc, getDoc, increment, writeBatch } from "firebase/firestore";
 import Swal from "sweetalert2";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
@@ -264,7 +264,7 @@ export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) =
     return (
         <div className="glass rounded-3xl shadow-xl overflow-hidden border border-white/50 bg-white/80 flex flex-col max-h-[800px]">
             {/* Filters Header */}
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between shrink-0">
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between ">
                 <div className="flex items-center gap-4 flex-1 min-w-[200px]">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />

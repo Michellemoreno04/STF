@@ -22,7 +22,7 @@ const options: Option[] = [
   { id: "Phone", label: 'Phone', icon: <Phone className="w-5 h-5 text-purple-500" /> },
 ];
 
-export default function ModalAddProducts({ onClose, onProductAdded }: { onClose: () => void; onProductAdded?: () => void }) {
+export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: () => void }) {
   const { user } = useAuth();
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -104,7 +104,7 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
             break;
           case "data": // Asurion
             type = "Other";
-            product = values.data ? `Asurion ${values.data}` : "Asurion Plan";
+            product = values.data ? ` ${values.data}` : "Asurion Plan";
             updateData.totalAsurion = increment(1);
             break;
           case "tv":
@@ -187,7 +187,7 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
       }
 
       setIsModalOpen(false);
-      onClose();
+
 
       Swal.fire({
         icon: 'success',
@@ -196,6 +196,7 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
         position: 'top-end',
         showConfirmButton: false,
         timer: 2000,
+
       }).then(() => {
         if (onProductAdded) {
           onProductAdded();
@@ -214,6 +215,7 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
     }
   };
 
+
   return (
     <>
       <button
@@ -225,7 +227,15 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
       </button>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all overflow-y-auto">
+
+        <div
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              saveData();
+            }
+          }}
+          tabIndex={0} // para que pueda presionar enter y tener el foco
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all overflow-y-auto">
           <div className="relative w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl border border-white/50 animate-in fade-in zoom-in duration-200 my-8">
             <button
               onClick={handleClose}
@@ -305,7 +315,7 @@ export default function ModalAddProducts({ onClose, onProductAdded }: { onClose:
                             className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
                           >
                             <option value="" disabled>Select plan</option>
-                            {["Total Care", "Plus", "Max"].map((plan) => (
+                            {["Total Care", "Heps", "Pp&s"].map((plan) => (
                               <option key={plan} value={plan}>{plan}</option>
                             ))}
                           </select>
