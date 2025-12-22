@@ -1,6 +1,6 @@
 import { CirclePlus, CircleUserRound, LogOut, UserCog, ChevronDown } from "lucide-react";
 
-import ModalAddProducts from "./sweetAlert/addProductModal";
+
 import { StatCards } from "./statCard/statCard";
 import { Table } from "./table/table";
 import { useAuth } from "./auth/authContext";
@@ -28,7 +28,8 @@ export default function PanelVentas() {
     asurion: 0,
     tv: 0,
     revenue: 0,
-    phone: 0
+    phone: 0,
+    dailyRevenue: 0,
   });
 
   const fetchStats = useCallback(async () => {
@@ -36,6 +37,20 @@ export default function PanelVentas() {
     const date = new Date();
     const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const userRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
+    // Consultar el documento de estadísticas diarias
+    const todayDate = new Date().toISOString().split('T')[0];
+    const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
+    let dailyRev = 0;
+
+    try {
+      const dailySnap = await getDoc(dailyRef);
+      if (dailySnap.exists()) {
+        dailyRev = dailySnap.data().revenue || 0;
+      }
+    } catch (error) {
+      console.error("Error fetching daily revenue:", error);
+    }
+
 
     try {
       const docSnap = await getDoc(userRef);
@@ -49,6 +64,7 @@ export default function PanelVentas() {
           tv: data.totalTv || 0,
           revenue: data.totalRevenue || 0,
           phone: data.totalPhone || 0,
+          dailyRevenue: dailyRev || 0,
         });
       } else {
         setStats({
@@ -58,7 +74,8 @@ export default function PanelVentas() {
           asurion: 0,
           tv: 0,
           revenue: 0,
-          phone: 0
+          phone: 0,
+          dailyRevenue: 0,
         });
       }
     } catch (error) {
@@ -108,9 +125,8 @@ export default function PanelVentas() {
 
       <div className="relative z-10 max-w-8xl mx-auto p-6">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-3 text-white">
-          <div >
-
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 text-white">
+          <div>
             <h1 className="text-4xl font-bold tracking-tight mb-1">STF Panel</h1>
             <p className="text-indigo-100 flex flex-row text-lg font-light">
               Welcome back
@@ -120,23 +136,28 @@ export default function PanelVentas() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 mt-4 md:mt-0">
-            {/* <div className="glass px-6 py-3 rounded-2xl flex flex-col items-end border-0 bg-white/10 backdrop-blur-md">
-              <span className="text-indigo-600  text-xs font-medium uppercase tracking-wider">Revenue Total</span>
-              <span className="text-2xl font-bold text-white">${totalRevenue.toLocaleString()}</span>
-            </div> */}
-            <ModalAddProducts onProductAdded={fetchStats} />
-
-            <div className="relative">
-              <button
-                onClick={() => setOpenMenu(!openMenu)}
-                className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-white/10 transition-colors border border-transparent hover:border-white/20"
+          {/* navbar */}
+          <div className="flex items-center gap-6 mt-4 md:mt-0 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-lg">
+            <nav className="flex items-center gap-6 mr-4">
+              <Link
+                to="/previous-months"
+                className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
               >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                  <CircleUserRound size={20} />
-                </div>
-                <ChevronDown size={16} className={`text-indigo-100 transition-transform duration-200 ${openMenu ? 'rotate-180' : ''}`} />
-              </button>
+                Previous Months
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
+              </Link>
+            </nav>
+            <button
+              onClick={() => setOpenMenu(!openMenu)}
+              className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-white/10 transition-colors border border-transparent hover:border-white/20"
+            >
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <CircleUserRound size={20} />
+              </div>
+              <ChevronDown size={16} className={`text-indigo-100 transition-transform duration-200 ${openMenu ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="relative">
+
 
               {openMenu && (
                 <>
@@ -176,45 +197,32 @@ export default function PanelVentas() {
                 </>
               )}
             </div>
-
-            <ProfileModal
-              isOpen={isProfileModalOpen}
-              onClose={() => setIsProfileModalOpen(false)}
-            />
-
           </div>
-        </header>
 
+
+
+
+
+
+          <ProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+          />
+
+
+        </header>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
           {/* Left column: Stats & Info */}
           <div className="lg:col-span-1 space-y-6 relative z-20">
             {/* Stats Grid */}
             <StatCards stats={stats} />
-
-            {/* Quick Actions / Help */}
-            <div className="glass p-6 rounded-3xl border border-white/60 shadow-lg bg-white/80">
-              <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                <CirclePlus size={18} className="text-indigo-600" />
-                Quick Actions
-              </h3>
-              <ul className="space-y-3 text-sm text-slate-600">
-                <Link to="/previous-months" className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
-                  <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                  Last month view
-                </Link>
-
-                <li className="flex items-center gap-2 p-2 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  Sales performance
-                </li>
-              </ul>
-            </div>
           </div>
 
 
           {/* Right column: Table & Filters */}
-          <main className="lg:col-span-3 space-y-6">
-            <Table onProductDeleted={fetchStats} />
+          <main className="lg:col-span-3">
+            <p className="text-sm ml-5 font-bold text-white">Daily Revenue: ${stats.dailyRevenue}</p>
+            <Table onProductDeleted={fetchStats} onProductAdded={fetchStats} />
           </main>
           <RankingComponente />
         </div>

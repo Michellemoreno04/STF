@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, PlusCircle, Smartphone, CirclePlus, WifiPen, Tv, Phone, Shield, RadioTower, SquarePen } from "lucide-react";
 import Swal from "sweetalert2";
 import { addDoc, collection, doc, setDoc, increment } from "firebase/firestore";
@@ -117,7 +118,7 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
             product = "Change of service";
             break;
           case "Phone":
-            type = "Other"; // Changed to match Table type or keep as Landline if needed, but Table uses "Other" in type definition usually? Actually Table has "Data" | "Devices" | "Line" | "Other".
+            type = "Phone"; // Changed to match Table type or keep as Landline if needed, but Table uses "Other" in type definition usually? Actually Table has "Data" | "Devices" | "Line" | "Other".
             // Let's check Table type definition. It says "Data" | "Devices" | "Line" | "Other".
             // But previous code had "Landline". Let's stick to "Other" or map it.
             // The previous code had "Landline" for Phone. Let's use "Other" for now to match the strict type or add "Landline" to Table later.
@@ -186,6 +187,13 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
         await setDoc(userRef, updateData, { merge: true });
       }
 
+      //*** */ Update Daily Stats.  ***(SE PUEDE HACER QUE SEA SOLO UN DOCUMENTO CON LA FECHA ACTUAL EN LUGAR DE GUARDAR TODAS LAS FECHAS PARA AHOORAR RECURSOS EN LA DB)
+      const todayDate = date.toISOString().split('T')[0];
+      const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
+      await setDoc(dailyRef, {
+        revenue: increment(totalRevenueVal)
+      }, { merge: true }); // esto es para que no se sobreescriba el documento si ya existe
+
       setIsModalOpen(false);
 
 
@@ -226,8 +234,7 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
         <CirclePlus size={20} />
       </button>
 
-      {isModalOpen && (
-
+      {isModalOpen && createPortal(
         <div
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -359,7 +366,8 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
               Save Changes
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

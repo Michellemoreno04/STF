@@ -11,6 +11,7 @@ export interface Stats {
     tv: number;
     revenue: number;
     phone: number;
+
 }
 
 export const StatCards = ({ stats }: { stats: Stats }) => {
@@ -84,7 +85,7 @@ function StatCard({ title, value, icon, color, goal }: { title: string, value: s
             </div>
             <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{title}</p>
-                <p className="text-xl font-bold text-slate-800 mt-0.5">{value}</p>
+                <p className="text-xl font-bold text-slate-800 mt-0.5">{value.toLocaleString()}</p>
             </div>
             {goal && (
                 <div className="absolute top-3 right-3 z-200">

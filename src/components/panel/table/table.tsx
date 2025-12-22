@@ -9,6 +9,8 @@ import Swal from "sweetalert2";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
 
+import ModalAddProducts from "./addProductModal";
+
 type Sale = {
     id: string;
     fecha: string; // ISO
@@ -20,7 +22,7 @@ type Sale = {
 
 };
 
-export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) => {
+export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?: () => void, onProductAdded?: () => void }) => {
     const { user } = useAuth();
     const [sales, setSales] = useState<Sale[]>([]);
     const [queryText, setQueryText] = useState("");
@@ -262,8 +264,10 @@ export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) =
     };
 
     return (
+
         <div className="glass rounded-3xl shadow-xl overflow-hidden border border-white/50 bg-white/80 flex flex-col max-h-[800px]">
             {/* Filters Header */}
+
             <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between ">
                 <div className="flex items-center gap-4 flex-1 min-w-[200px]">
                     <div className="relative flex-1 max-w-md">
@@ -319,6 +323,9 @@ export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) =
                             <X size={18} />
                         </button>
                     )}
+                    <div className="ml-auto">
+                        <ModalAddProducts onProductAdded={onProductAdded} />
+                    </div>
                 </div>
             </div>
 
@@ -433,5 +440,6 @@ export const Table = ({ onProductDeleted }: { onProductDeleted?: () => void }) =
 
             </div>
         </div>
+
     );
 };

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { db } from "../../../firebase";
 import { collection, onSnapshot, query, collectionGroup, getDocs } from "firebase/firestore";
+import { Search } from "lucide-react";
 
 interface RankingUser {
     id: string;
     name: string;
     lines: number;
-    devices: number;
+    data: number;
     revenue: number;
     avatar: string;
 }
@@ -14,6 +15,7 @@ interface RankingUser {
 export const RankingComponente = () => {
     const [users, setUsers] = useState<RankingUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const [queryText, setQueryText] = useState('');
 
     useEffect(() => {
         const fetchRankingData = async () => {
@@ -63,7 +65,7 @@ export const RankingComponente = () => {
                                     name: userProfiles[userId].name,
                                     avatar: userProfiles[userId].avatar,
                                     lines: data.totalLines || 0,
-                                    devices: data.totalDevices || 0,
+                                    data: data.totalInternet || 0,
                                     revenue: data.totalRevenue || 0
                                 });
                             }
@@ -71,7 +73,7 @@ export const RankingComponente = () => {
                     });
 
                     // Sort by revenue descending
-                    rankingData.sort((a, b) => b.revenue - a.revenue);
+                    rankingData.sort((a, b) => b.lines - a.lines);
                     setUsers(rankingData);
                     setLoading(false);
                 });
@@ -90,6 +92,10 @@ export const RankingComponente = () => {
         };
     }, []);
 
+    const filteredUsers = users.filter(user =>
+        user.name.toLowerCase().includes(queryText.toLowerCase())
+    );
+
     if (loading) {
         return (
             <div className="w-full h-[90%] bg-white/80 border border-white/20 rounded-3xl p-4 shadow-xl flex items-center justify-center">
@@ -99,19 +105,29 @@ export const RankingComponente = () => {
     }
 
     return (
-        <div className="w-full h-[90%] overflow-y-auto bg-white/80 border border-white/20 rounded-3xl p-4 shadow-xl">
+        <div className="w-full h-[90%] bg-white/80 border border-white/20 rounded-3xl p-4 shadow-xl">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Top Performers</h2>
                 <div className="px-3 py-1 bg-indigo-100 rounded-full text-xs font-medium text-indigo-600 border border-indigo-200">
                     This Month
                 </div>
             </div>
+            <div className="relative flex-1 max-w-md mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                    type="text"
+                    placeholder="Buscar "
+                    value={queryText}
+                    onChange={(e) => setQueryText(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-600 placeholder:text-slate-400"
+                />
+            </div>
 
-            <div className="flex flex-col gap-4">
-                {users.length === 0 ? (
+            <div className=" h-[90%] flex flex-col gap-4 overflow-y-auto ">
+                {filteredUsers.length === 0 ? (
                     <div className="text-center text-slate-500 py-4">No data available for this month</div>
                 ) : (
-                    users.map((user, index) => (
+                    filteredUsers.map((user, index) => (
                         <div key={user.id} className="group bg-white hover:bg-indigo-50/50 transition-all duration-300 rounded-2xl p-3 border border-slate-100 hover:border-indigo-100 shadow-sm hover:shadow-md">
                             {/* Top Row: Rank, Avatar, Name */}
                             <div className="flex items-center gap-3 mb-3">
@@ -134,8 +150,8 @@ export const RankingComponente = () => {
                                     <span className="text-blue-600 font-bold text-sm">{user.lines}</span>
                                 </div>
                                 <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-purple-50 border border-purple-100">
-                                    <span className="text-[10px] text-purple-400 uppercase font-bold mb-0.5">Devices</span>
-                                    <span className="text-purple-600 font-bold text-sm">{user.devices}</span>
+                                    <span className="text-[10px] text-purple-400 uppercase font-bold mb-0.5">Data</span>
+                                    <span className="text-purple-600 font-bold text-sm">{user.data}</span>
                                 </div>
                                 <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-emerald-50 border border-emerald-100">
                                     <span className="text-[10px] text-emerald-400 uppercase font-bold mb-0.5">Revenue</span>
