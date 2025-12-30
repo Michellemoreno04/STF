@@ -105,7 +105,7 @@ export const RankingComponente = () => {
     }
 
     return (
-        <div className="w-full h-[90%] bg-white/80 border border-white/20 rounded-3xl p-4 shadow-xl">
+        <div className="w-full h-[90%] bg-white/80 border border-white/20 rounded-3xl p-4 shadow-xl overflow-hidden">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Top Performers</h2>
                 <div className="px-3 py-1 bg-indigo-100 rounded-full text-xs font-medium text-indigo-600 border border-indigo-200">

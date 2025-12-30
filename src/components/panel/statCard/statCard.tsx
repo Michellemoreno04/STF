@@ -60,7 +60,7 @@ export const StatCards = ({ stats }: { stats: Stats }) => {
                 />
                 <StatCard
                     title="Revenue"
-                    value={`$${stats.revenue.toFixed(2)}`}
+                    value={`$${stats.revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     icon={<CircleDollarSign className="text-white" size={18} />}
                     color="bg-gradient-to-br from-emerald-400 to-teal-500"
                     goal='$10 Per call'

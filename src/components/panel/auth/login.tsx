@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from '../../../firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Mail, Lock, User, ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
@@ -11,10 +11,19 @@ const Login: React.FC = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false)
+    const [rememberMe, setRememberMe] = useState(false);
 
     const [name, setName] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
     const [resetEmailSent, setResetEmailSent] = useState(false);
+
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('rememberedEmail');
+        if (savedEmail) {
+            setEmail(savedEmail);
+            setRememberMe(true);
+        }
+    }, []);
 
     const handleResetPassword = async () => {
         if (!email) {
@@ -43,6 +52,9 @@ const Login: React.FC = () => {
         setError(null);
 
         try {
+            // Set persistence to local (browser session)
+            await setPersistence(auth, browserLocalPersistence);
+
             if (isSignUp) {
                 if (password !== confirmPassword) {
                     setError("The passwords do not match");
@@ -73,7 +85,15 @@ const Login: React.FC = () => {
                     uid: user.uid,
                     email: user.email,
                     lastLogin: serverTimestamp(),
+                    displayName: user.displayName,
                 }, { merge: true });
+
+                // Handle Remember Me logic
+                if (rememberMe) {
+                    localStorage.setItem('rememberedEmail', email);
+                } else {
+                    localStorage.removeItem('rememberedEmail');
+                }
             }
         } catch (err: any) {
             console.error("Auth error:", err);
@@ -159,6 +179,7 @@ const Login: React.FC = () => {
                                         className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-xl bg-gray-50 dark:bg-zinc-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                         placeholder="John Doe"
                                         required={isSignUp}
+                                        autoComplete="name"
                                     />
                                 </div>
                             </div>
@@ -177,6 +198,7 @@ const Login: React.FC = () => {
                                     className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-xl bg-gray-50 dark:bg-zinc-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="name@company.com"
                                     required
+                                    autoComplete="email"
                                 />
                             </div>
                         </div>
@@ -194,6 +216,7 @@ const Login: React.FC = () => {
                                     className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-xl bg-gray-50 dark:bg-zinc-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                     placeholder="Password"
                                     required
+                                    autoComplete={isSignUp ? "new-password" : "current-password"}
                                 />
                                 <button className='absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'>
                                     {showPassword ? <EyeOff onClick={() => setShowPassword(false)} /> : <Eye onClick={() => setShowPassword(true)} />}
@@ -211,14 +234,27 @@ const Login: React.FC = () => {
                                         className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-zinc-700 rounded-xl bg-gray-50 dark:bg-zinc-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                         placeholder="Confirm Password"
                                         required
-
+                                        autoComplete="new-password"
                                     />
                                 </div>
                             )}
                         </div>
 
                         {!isSignUp && (
-                            <div className="flex justify-end">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <input
+                                        id="remember-me"
+                                        name="remember-me"
+                                        type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                                    />
+                                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        Remember me
+                                    </label>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={handleResetPassword}

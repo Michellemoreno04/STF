@@ -19,6 +19,7 @@ type Sale = {
     cantidad: number;
     precioUnitario: number;
     revenue: number;
+    hora: string;
 
 };
 
@@ -30,6 +31,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
     const [filterDate, setFilterDate] = useState("");
     const [limitCount, setLimitCount] = useState(10);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [editingSale, setEditingSale] = useState<Sale | null>(null);
 
     useEffect(() => {
         if (!user) return;
@@ -81,6 +83,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
                     cantidad: data.quantity || 1,
                     precioUnitario: data.quantity ? (Number(data.revenue) || 0) / data.quantity : 0,
                     revenue: Number(data.revenue) || 0,
+                    hora: data.hour,
 
                 };
             });
@@ -98,6 +101,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
             .toLowerCase()
             .includes(queryText.toLowerCase());
         const matchesTipo = filterTipo === "Todos" || s.tipo === filterTipo;
+
 
         // Date is already filtered by Firestore if filterDate is set, 
         // but we keep this if we want to be double sure or if the query changes.
@@ -125,6 +129,11 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [activeMenuId]);
+
+    const handleEdit = (sale: Sale) => {
+        setActiveMenuId(null); // Close menu
+        setEditingSale(sale);
+    };
 
     const handleDelete = async (sale: Sale) => {
         setActiveMenuId(null); // Close menu
@@ -267,8 +276,14 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
 
         <div className="glass rounded-3xl shadow-xl overflow-hidden border border-white/50 bg-white/80 flex flex-col max-h-[800px]">
             {/* Filters Header */}
-
             <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between ">
+                <div className="ml-auto">
+                    <ModalAddProducts
+                        onProductAdded={onProductAdded}
+                        editingSale={editingSale}
+                        onEditComplete={() => setEditingSale(null)}
+                    />
+                </div>
                 <div className="flex items-center gap-4 flex-1 min-w-[200px]">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -323,9 +338,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
                             <X size={18} />
                         </button>
                     )}
-                    <div className="ml-auto">
-                        <ModalAddProducts onProductAdded={onProductAdded} />
-                    </div>
+
                 </div>
             </div>
 
@@ -350,6 +363,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
                                             <Calendar size={14} className="text-slate-400" />
                                             {new Date(s.fecha).toLocaleDateString()}
                                         </div>
+                                        <span className="text-slate-400"> {s.hora}</span>
                                     </td>
                                     <td className="p-5">
                                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(s.tipo)}`}>
@@ -375,6 +389,16 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
 
                                         {activeMenuId === s.id && (
                                             <div className="absolute right-8 top-1/2 -translate-y-1/2 w-32 bg-white rounded-xl shadow-lg border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEdit(s);
+                                                    }}
+                                                    className="w-full text-left px-4 py-2.5 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                                                >
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                    Editar
+                                                </button>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();

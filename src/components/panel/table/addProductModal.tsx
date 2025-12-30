@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { X, PlusCircle, Smartphone, CirclePlus, WifiPen, Tv, Phone, Shield, RadioTower, SquarePen } from "lucide-react";
 import Swal from "sweetalert2";
-import { addDoc, collection, doc, setDoc, increment } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc, increment, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
 
@@ -23,7 +23,26 @@ const options: Option[] = [
   { id: "Phone", label: 'Phone', icon: <Phone className="w-5 h-5 text-purple-500" /> },
 ];
 
-export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: () => void }) {
+interface Sale {
+  id: string;
+  fecha: string;
+  tipo: "Data" | "Devices" | "Line" | "Other";
+  producto: string;
+  cantidad: number;
+  precioUnitario: number;
+  revenue: number;
+  hora: string;
+}
+
+export default function ModalAddProducts({
+  onProductAdded,
+  editingSale,
+  onEditComplete
+}: {
+  onProductAdded?: () => void;
+  editingSale?: Sale | null;
+  onEditComplete?: () => void;
+}) {
   const { user } = useAuth();
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -40,7 +59,27 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
     setValues((prev) => ({ ...prev, [id]: value }));
 
   const handleOpen = () => setIsModalOpen(true);
-  const handleClose = () => setIsModalOpen(false);
+  const handleClose = () => {
+    setIsModalOpen(false);
+    if (onEditComplete) {
+      onEditComplete();
+    }
+    // Reset form
+    setSelectedOptions([]);
+    setValues({});
+    setGlobalRevenue("");
+  };
+
+  // Effect to open modal and populate form when editingSale changes
+  React.useEffect(() => {
+    if (editingSale) {
+      setIsModalOpen(true);
+      setGlobalRevenue(editingSale.revenue.toString());
+      // We'll need to parse the product data to populate the form
+      // For now, we'll just set the revenue
+      // You may need to enhance this based on how product data is stored
+    }
+  }, [editingSale]);
 
   const saveData = async () => {
     if (!user) {
@@ -49,6 +88,12 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
         title: 'Error...',
         text: 'You must be logged in to add products!',
       });
+      return;
+    }
+
+    // If editing, use update logic instead
+    if (editingSale) {
+      await updateData();
       return;
     }
 
@@ -118,22 +163,7 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
             product = "Change of service";
             break;
           case "Phone":
-            type = "Phone"; // Changed to match Table type or keep as Landline if needed, but Table uses "Other" in type definition usually? Actually Table has "Data" | "Devices" | "Line" | "Other".
-            // Let's check Table type definition. It says "Data" | "Devices" | "Line" | "Other".
-            // But previous code had "Landline". Let's stick to "Other" or map it.
-            // The previous code had "Landline" for Phone. Let's use "Other" for now to match the strict type or add "Landline" to Table later.
-            // Actually, let's look at the switch in Table. It handles "Teléfono", "Línea", "Datos".
-            // Wait, the Table component maps types to icons.
-            // Let's use "Other" for Phone to be safe, or "Teléfono" if we want to match the Spanish filter in Table?
-            // The Table component has `type Sale = { ... tipo: "Data" | "Devices" | "Line" | "Other"; ... }`
-            // But the filter uses "Teléfono", "Línea", "Datos".
-            // And `getStatusIcon` checks for "Teléfono", "Línea", "Datos".
-            // This suggests a mismatch in the current code between saved "type" and Table's expected "tipo".
-            // The previous code saved "Devices", "Líne", "Data add", "Others", "Landline".
-            // The Table `getStatusIcon` checks "Teléfono", "Línea", "Datos".
-            // This seems inconsistent. I should probably standardize.
-            // For now, I will try to be consistent with what I see in Table's `getStatusIcon` or just use a generic "Bundle" type for the main doc.
-
+            type = "Phone";
             // Let's build the individual item:
             product = "Phone Service";
             updateData.totalPhone = increment(1);
@@ -165,9 +195,18 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
       // Construct summary string
       const productSummary = summaryParts.join(", ");
 
+      // Format hour in 12-hour format with AM/PM
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const hours12 = hours % 12 || 12; // Convert to 12-hour format (0 becomes 12)
+      const formattedHour = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+
       const productData = {
         userId: user.uid,
         date: new Date().toISOString(),
+        hour: formattedHour,
         type: mainType,
         product: productSummary,
         products: productsList, // Array of details
@@ -223,6 +262,78 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
     }
   };
 
+  const updateData = async () => {
+    if (!user || !editingSale) return;
+
+    try {
+      const productRef = doc(db, "users", user.uid, "products", editingSale.id);
+      const productSnap = await getDoc(productRef);
+
+      if (!productSnap.exists()) {
+        throw new Error("Document does not exist");
+      }
+
+      const oldData = productSnap.data();
+      const oldRevenue = oldData.revenue || 0;
+      const newRevenue = parseFloat(globalRevenue) || 0;
+      const revenueDiff = newRevenue - oldRevenue;
+
+      // Update the product document
+      await updateDoc(productRef, {
+        revenue: newRevenue
+      });
+
+      // Update monthly stats
+      const date = new Date(oldData.date);
+      const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const statsRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
+
+      if (revenueDiff !== 0) {
+        await setDoc(statsRef, {
+          totalRevenue: increment(revenueDiff)
+        }, { merge: true });
+      }
+
+      // Update daily stats
+      const todayDate = date.toISOString().split('T')[0];
+      const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
+      if (revenueDiff !== 0) {
+        await setDoc(dailyRef, {
+          revenue: increment(revenueDiff)
+        }, { merge: true });
+      }
+
+      setIsModalOpen(false);
+      if (onEditComplete) {
+        onEditComplete();
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Actualizado!',
+        text: 'El producto ha sido actualizado exitosamente!',
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2000,
+      }).then(() => {
+        if (onProductAdded) {
+          onProductAdded();
+        }
+      });
+
+      setValues({});
+      setSelectedOptions([]);
+      setGlobalRevenue("");
+    } catch (error) {
+      console.error("Error updating document: ", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error...',
+        text: 'No se pudo actualizar el producto!',
+      });
+    }
+  };
+
 
   return (
     <>
@@ -255,7 +366,7 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
               <div className="p-2 bg-indigo-100 rounded-xl">
                 <PlusCircle className="h-6 w-6 text-indigo-600" />
               </div>
-              Add Products
+              {editingSale ? 'Editar Producto' : 'Add Products'}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -322,7 +433,7 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
                             className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
                           >
                             <option value="" disabled>Select plan</option>
-                            {["Total Care", "Heps", "Pp&s"].map((plan) => (
+                            {["Total Care", "Max", 'Plus', "Heps", "Pp&s"].map((plan) => (
                               <option key={plan} value={plan}>{plan}</option>
                             ))}
                           </select>
@@ -357,13 +468,13 @@ export default function ModalAddProducts({ onProductAdded }: { onProductAdded?: 
 
             <button
               onClick={saveData}
-              disabled={selectedOptions.length === 0}
+              disabled={editingSale ? false : selectedOptions.length === 0}
               className={`mt-8 w-full rounded-2xl py-3.5 font-semibold text-white shadow-lg transition-all duration-200 
-                ${selectedOptions.length > 0
+                ${(editingSale || selectedOptions.length > 0)
                   ? "bg-indigo-600 shadow-indigo-500/30 hover:bg-indigo-700 hover:shadow-indigo-500/40 hover:-translate-y-0.5 cursor-pointer"
                   : "bg-slate-300 cursor-not-allowed"}`}
             >
-              Save Changes
+              {editingSale ? 'Actualizar' : 'Save Changes'}
             </button>
           </div>
         </div>,

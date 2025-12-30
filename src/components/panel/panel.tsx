@@ -1,4 +1,4 @@
-import { CirclePlus, CircleUserRound, LogOut, UserCog, ChevronDown } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -107,7 +107,7 @@ export default function PanelVentas() {
   useEffect(() => {
     fetchStats();
     getUserInfo();
-  }, [fetchStats]);
+  }, [fetchStats, user]);
 
   const handleSignOut = () => {
     logout();
