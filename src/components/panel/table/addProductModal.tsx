@@ -121,6 +121,15 @@ export default function ModalAddProducts({
 
       const productsList: any[] = [];
       let totalQuantity = 0;
+
+      // Daily stats counters
+      let countLines = 0;
+      let countDevices = 0;
+      let countInternet = 0;
+      let countAsurion = 0;
+      let countTv = 0;
+      let countPhone = 0;
+
       let summaryParts: string[] = [];
       let typesSet = new Set<string>();
 
@@ -166,9 +175,18 @@ export default function ModalAddProducts({
             type = "Phone";
             // Let's build the individual item:
             product = "Phone Service";
+            product = "Phone Service";
             updateData.totalPhone = increment(1);
             break;
         }
+
+        // Track daily counts manually
+        if (optionId === 'lines') countLines += quantity;
+        if (optionId === 'devices') countDevices += quantity;
+        if (optionId === 'internet') countInternet += 1; // data
+        if (optionId === 'data') countAsurion += 1;
+        if (optionId === 'tv') countTv += 1;
+        if (optionId === 'Phone') countPhone += 1;
 
         // Normalize type for the set to determine if it's a mix
         typesSet.add(type);
@@ -226,11 +244,17 @@ export default function ModalAddProducts({
         await setDoc(userRef, updateData, { merge: true });
       }
 
-      //*** */ Update Daily Stats.  ***(SE PUEDE HACER QUE SEA SOLO UN DOCUMENTO CON LA FECHA ACTUAL EN LUGAR DE GUARDAR TODAS LAS FECHAS PARA AHOORAR RECURSOS EN LA DB)
+      //*** */ Update Daily Stats.
       const todayDate = date.toISOString().split('T')[0];
       const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
       await setDoc(dailyRef, {
-        revenue: increment(totalRevenueVal)
+        revenue: increment(totalRevenueVal),
+        lines: increment(countLines),
+        data: increment(countInternet),
+        devices: increment(countDevices),
+        tv: increment(countTv),
+        asurion: increment(countAsurion),
+        phone: increment(countPhone)
       }, { merge: true }); // esto es para que no se sobreescriba el documento si ya existe
 
       setIsModalOpen(false);

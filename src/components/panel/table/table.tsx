@@ -113,7 +113,7 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
 
     const handleLoadMore = () => {
         setLoadingMore(true);
-        setLimitCount((prev) => prev + 10);
+        setLimitCount((prev) => prev + 15);
     };
 
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -215,6 +215,25 @@ export const Table = ({ onProductDeleted, onProductAdded }: { onProductDeleted?:
                     totalTv: increment(-decTv),
                     totalPhone: increment(-decPhone),
                     totalRevenue: increment(-revenue)
+                }, { merge: true });
+
+                // Update Daily Stats (Decrement)
+                const todayDate = date.toISOString().split('T')[0];
+                const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
+
+                // Only update daily stats if it's the SAME day (optional check, but good for consistency)
+                // Actually, if we delete a past product, we should probably update that day's stats?
+                // The logical flow assumes we are correcting stats. 
+                // However, daily_stats keys are yyyy-mm-dd, so we just write to that doc.
+
+                batch.set(dailyRef, {
+                    lines: increment(-decLines),
+                    devices: increment(-decDevices),
+                    data: increment(-decInternet),
+                    asurion: increment(-decAsurion),
+                    tv: increment(-decTv),
+                    phone: increment(-decPhone),
+                    revenue: increment(-revenue)
                 }, { merge: true });
 
                 // Delete product

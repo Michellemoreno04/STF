@@ -52,27 +52,32 @@ export const RankingComponente = () => {
                 const q = query(collectionGroup(db, 'monthly_stats'));
 
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const rankingData: RankingUser[] = [];
+                    const statsByUserId: Record<string, any> = {};
 
                     snapshot.docs.forEach(doc => {
                         // Check if this document corresponds to the current month
                         if (doc.id === currentMonth) {
                             const userId = doc.ref.parent.parent?.id; // users/{userId}/monthly_stats/{month}
-                            if (userId && userProfiles[userId]) {
-                                const data = doc.data();
-                                rankingData.push({
-                                    id: userId,
-                                    name: userProfiles[userId].name,
-                                    avatar: userProfiles[userId].avatar,
-                                    lines: data.totalLines || 0,
-                                    data: data.totalInternet || 0,
-                                    revenue: data.totalRevenue || 0
-                                });
+                            if (userId) {
+                                statsByUserId[userId] = doc.data();
                             }
                         }
                     });
 
-                    // Sort by revenue descending
+                    // Include all user profiles, even if they don't have stats for this month
+                    const rankingData: RankingUser[] = Object.keys(userProfiles).map(userId => {
+                        const stats = statsByUserId[userId];
+                        return {
+                            id: userId,
+                            name: userProfiles[userId].name,
+                            avatar: userProfiles[userId].avatar,
+                            lines: stats?.totalLines || 0,
+                            data: stats?.totalInternet || 0,
+                            revenue: stats?.totalRevenue || 0
+                        };
+                    });
+
+                    // Sort by lines descending
                     rankingData.sort((a, b) => b.lines - a.lines);
                     setUsers(rankingData);
                     setLoading(false);
