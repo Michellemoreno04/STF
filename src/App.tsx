@@ -4,12 +4,14 @@ import PanelVentas from './components/panel/panel'
 import { useAuth } from './components/panel/auth/authContext'
 import Login from './components/panel/auth/login'
 import { Challenge } from './components/challenge/challenge'
+import { DailyRanking } from './components/dailyRanking/dailyRanking'
 import { useEffect } from 'react'
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import Swal from 'sweetalert2'
 import { useNavigate, Routes, Route } from 'react-router-dom'
 import { PassMonth } from './components/panel/statCard/previousMonths'
+
 
 function App() {
   const { user, loading } = useAuth();
@@ -44,6 +46,8 @@ function Router() {
       where("status", "==", "pending")
     );
 
+
+    //global listener for Battle Notifications
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
@@ -77,6 +81,7 @@ function Router() {
       <Route path="/" element={<App />} />
       <Route path="/previous-months" element={<PassMonth />} />
       <Route path="/challenge" element={<Challenge />} />
+      <Route path="/daily-ranking" element={<DailyRanking />} />
     </Routes>
   )
 }

@@ -29,14 +29,14 @@ export const StatCards = ({ stats }: { stats: Stats }) => {
                     value={stats.lines.toString()}
                     icon={<TrendingUp className="text-white" size={18} />}
                     color="bg-gradient-to-br from-pink-500 to-rose-500"
-                    goal="Mobile yield 3% a 4%"
+                    goal="Mobile yield 5%"
                 />
                 <StatCard
                     title="Devices"
                     value={stats.devices.toString()}
                     icon={<Smartphone className="text-white" size={18} />}
                     color="bg-gradient-to-br from-indigo-500 to-blue-500"
-                    goal="Mobile yield 3% a 4%"
+                    goal="Mobile yield 5%"
                 />
                 <StatCard
                     title="Data add"
@@ -63,7 +63,7 @@ export const StatCards = ({ stats }: { stats: Stats }) => {
                     value={`$${stats.revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     icon={<CircleDollarSign className="text-white" size={18} />}
                     color="bg-gradient-to-br from-emerald-400 to-teal-500"
-                    goal='$10 Per call'
+                    goal='$15 Per call'
                 />
                 <StatCard
                     title="Phone"

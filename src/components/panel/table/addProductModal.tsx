@@ -245,7 +245,11 @@ export default function ModalAddProducts({
       }
 
       //*** */ Update Daily Stats.
-      const todayDate = date.toISOString().split('T')[0];
+      // const todayDate = date.toISOString().split('T')[0]; // Removed UTC calculation
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const todayDate = `${year}-${month}-${day}`;
       const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
       await setDoc(dailyRef, {
         revenue: increment(totalRevenueVal),
@@ -319,7 +323,11 @@ export default function ModalAddProducts({
       }
 
       // Update daily stats
-      const todayDate = date.toISOString().split('T')[0];
+      // const todayDate = date.toISOString().split('T')[0]; // Removed UTC calculation
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const todayDate = `${year}-${month}-${day}`;
       const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
       if (revenueDiff !== 0) {
         await setDoc(dailyRef, {

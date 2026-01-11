@@ -43,7 +43,11 @@ export default function PanelVentas() {
     const currentMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const userRef = doc(db, "users", user.uid, "monthly_stats", currentMonth);
     // Consultar el documento de estadísticas diarias
-    const todayDate = new Date().toISOString().split('T')[0];
+    // const todayDate = new Date().toISOString().split('T')[0]; // Removed UTC calculation
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const todayDate = `${year}-${month}-${day}`;
     const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
     let dailyRev = 0;
 
@@ -118,7 +122,12 @@ export default function PanelVentas() {
   // Listener for pending challenges
   useEffect(() => {
     if (!user) return;
-    const todayDate = new Date().toISOString().split('T')[0];
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const todayDate = `${year}-${month}-${day}`;
+    // const todayDate = new Date().toISOString().split('T')[0]; // Removed UTC calculation
     const q = query(
       collection(db, "challenges"),
       where("opponentId", "==", user.uid),
@@ -187,15 +196,22 @@ export default function PanelVentas() {
           <div className="flex items-center gap-6 mt-4 md:mt-0 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-lg">
             <nav className="flex items-center gap-6 mr-4">
               <Link
-                to="/challenge"
+                to="/daily-ranking"
                 className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
+              >
+                Daily Ranking
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
+              </Link>
+              <Link
+                to="/challenge"
+                className="text-indigo-100 font-medium hover:text-white cursor-pointer transition-colors relative group"
               >
                 Challenge a friend
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
               </Link>
               <Link
                 to="/previous-months"
-                className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
+                className="text-indigo-100 font-medium hover:text-white cursor-pointer transition-colors relative group"
               >
                 Previous Months
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>

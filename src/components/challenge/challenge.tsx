@@ -33,6 +33,9 @@ interface ChallengeData {
     goalType: GoalType;
     status: 'pending' | 'accepted' | 'declined' | 'completed';
     date: string;
+    challengerFinished?: boolean;
+    opponentFinished?: boolean;
+    winnerId?: string;
 }
 
 export const Challenge = () => {
@@ -189,13 +192,242 @@ export const Challenge = () => {
 
     }, [user, selectedChallengeId, activeChallenges]);
 
-    // para terminar la batalla
+    // Listener para detectar cuando ambos usuarios terminan
+    useEffect(() => {
+        if (!user || !selectedChallengeId) return;
+
+        const challengeRef = doc(db, "challenges", selectedChallengeId);
+        const unsubscribe = onSnapshot(challengeRef, async (docSnap) => {
+            if (!docSnap.exists()) return;
+
+            const challengeData = docSnap.data() as ChallengeData;
+            const isAmChallenger = challengeData.challengerId === user.uid;
+            const haveIFinished = isAmChallenger ? challengeData.challengerFinished : challengeData.opponentFinished;
+            const hasOpponentFinished = isAmChallenger ? challengeData.opponentFinished : challengeData.challengerFinished;
+
+            // Si ambos terminaron y yo ya había terminado antes, mostrar resultados
+            if (haveIFinished && hasOpponentFinished && challengeData.status === 'completed') {
+                // Determine winner
+                let myVal = 0;
+                let oppVal = 0;
+
+                if (challengeData.goalType === 'revenue') {
+                    myVal = myStats.revenue;
+                    oppVal = opponentStats.revenue;
+                } else if (challengeData.goalType === 'lines') {
+                    myVal = myStats.lines;
+                    oppVal = opponentStats.lines;
+                } else {
+                    myVal = myStats.data;
+                    oppVal = opponentStats.data;
+                }
+
+                const iWin = myVal > oppVal;
+                const tie = myVal === oppVal;
+
+                // Prepare participant data
+                const myName = user?.displayName || 'Me';
+                const myAvatar = user?.photoURL || `https://ui-avatars.com/api/?name=${myName}&background=6366f1`;
+                const oppName = selectedOpponent?.name || 'Opponent';
+                const oppAvatar = selectedOpponent?.avatar || `https://ui-avatars.com/api/?name=${oppName}&background=ec4899`;
+
+                // Format value based on goal type
+                const formatValue = (val: number) => {
+                    if (challengeData.goalType === 'revenue') return `$${val.toFixed(2)}`;
+                    return val.toString();
+                };
+
+                const goalLabel = challengeData.goalType === 'revenue' ? 'Revenue' :
+                    challengeData.goalType === 'lines' ? 'Lines' : 'Data';
+
+                // Show custom comparison modal
+                await Swal.fire({
+                    title: tie ? '🤝 ¡Empate!' : (iWin ? '🏆 ¡Victoria!' : '💔 Derrota'),
+                    html: `
+                        <div style="padding: 20px 10px;">
+                            <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px; margin-bottom: 30px;">
+                                <!-- Winner/Loser 1 -->
+                                <div style="flex: 1; text-align: center; position: relative;">
+                                    <div style="
+                                        width: 100px; 
+                                        height: 100px; 
+                                        margin: 0 auto 15px; 
+                                        border-radius: 50%; 
+                                        overflow: hidden;
+                                        border: 4px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
+                                        position: relative;
+                                    ">
+                                        <img src="${myAvatar}" alt="${myName}" style="width: 100%; height: 100%; object-fit: cover;" />
+                                    </div>
+                                    ${!tie ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: -10px;
+                                            left: 50%;
+                                            transform: translateX(-50%);
+                                            background: ${iWin ? '#22c55e' : '#ef4444'};
+                                            color: white;
+                                            padding: 4px 12px;
+                                            border-radius: 12px;
+                                            font-size: 12px;
+                                            font-weight: bold;
+                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                        ">
+                                            ${iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
+                                        </div>
+                                    ` : ''}
+                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${myName}</h3>
+                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
+                                    <div style="
+                                        background: ${iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
+                                        border: 1px solid ${iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+                                        border-radius: 12px;
+                                        padding: 12px;
+                                        margin-top: 10px;
+                                    ">
+                                        <div style="font-size: 28px; font-weight: bold; color: ${iWin ? '#22c55e' : '#ef4444'};">
+                                            ${formatValue(myVal)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- VS Badge -->
+                                <div style="
+                                    width: 60px;
+                                    height: 60px;
+                                    background: linear-gradient(135deg, #f97316, #ef4444);
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-weight: 900;
+                                    font-size: 20px;
+                                    color: white;
+                                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+                                    flex-shrink: 0;
+                                ">
+                                    VS
+                                </div>
+
+                                <!-- Winner/Loser 2 -->
+                                <div style="flex: 1; text-align: center; position: relative;">
+                                    <div style="
+                                        width: 100px; 
+                                        height: 100px; 
+                                        margin: 0 auto 15px; 
+                                        border-radius: 50%; 
+                                        overflow: hidden;
+                                        border: 4px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
+                                        position: relative;
+                                    ">
+                                        <img src="${oppAvatar}" alt="${oppName}" style="width: 100%; height: 100%; object-fit: cover;" />
+                                    </div>
+                                    ${!tie ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: -10px;
+                                            left: 50%;
+                                            transform: translateX(-50%);
+                                            background: ${!iWin ? '#22c55e' : '#ef4444'};
+                                            color: white;
+                                            padding: 4px 12px;
+                                            border-radius: 12px;
+                                            font-size: 12px;
+                                            font-weight: bold;
+                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                        ">
+                                            ${!iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
+                                        </div>
+                                    ` : ''}
+                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${oppName}</h3>
+                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
+                                    <div style="
+                                        background: ${!iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
+                                        border: 1px solid ${!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+                                        border-radius: 12px;
+                                        padding: 12px;
+                                        margin-top: 10px;
+                                    ">
+                                        <div style="font-size: 28px; font-weight: bold; color: ${!iWin ? '#22c55e' : '#ef4444'};">
+                                            ${formatValue(oppVal)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+    ${tie ?
+                            '<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
+                            `<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">
+                                    ${iWin ? '¡Felicidades! Has ganado esta batalla.' : 'Sigue esforzándote para la próxima victoria.'}
+                                </p>`
+                        }
+                        </div >
+    `,
+                    confirmButtonText: 'Volver al Dashboard',
+                    background: '#1e293b',
+                    color: '#fff',
+                    confirmButtonColor: '#6366f1',
+                    width: '600px',
+                    showClass: {
+                        popup: 'animate__animated animate__zoomIn animate__faster'
+                    },
+                    hideClass: {
+                        popup: 'animate__animated animate__zoomOut animate__faster'
+                    }
+                });
+
+                // Update local state
+                setActiveChallenges(prev => prev.filter(c => c.id !== selectedChallengeId));
+                setSelectedChallengeId(null);
+                setViewState('dashboard');
+            }
+        });
+
+        return () => unsubscribe();
+    }, [user, selectedChallengeId, myStats, opponentStats, selectedOpponent]);
+
     // para terminar la batalla
     const terminarBattle = async () => {
         if (!selectedChallengeId || !user) return;
 
         const currentChallenge = activeChallenges.find(c => c.id === selectedChallengeId);
         if (!currentChallenge) return;
+
+        const isAmChallenger = currentChallenge.challengerId === user.uid;
+        const haveIFinished = isAmChallenger ? currentChallenge.challengerFinished : currentChallenge.opponentFinished;
+        const hasOpponentFinished = isAmChallenger ? currentChallenge.opponentFinished : currentChallenge.challengerFinished;
+
+        // Si ya terminé, no hacer nada
+        if (haveIFinished) {
+            Swal.fire({
+                title: 'Ya terminaste',
+                text: hasOpponentFinished ? 'Ambos han terminado la batalla' : 'Esperando a que tu oponente termine...',
+                icon: 'info',
+                background: '#1e293b',
+                color: '#fff',
+                confirmButtonColor: '#6366f1',
+            });
+            return;
+        }
+
+        // 1️⃣ Preguntar confirmación
+        const confirmacion = await Swal.fire({
+            title: '¿Seguro que quieres terminar la batalla?',
+            text: hasOpponentFinished ? 'Tu oponente ya terminó. Al confirmar verás los resultados.' : 'Podrás ver los resultados cuando ambos terminen',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, terminar',
+            cancelButtonText: 'Cancelar',
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#22c55e',
+            cancelButtonColor: '#ef4444',
+        });
+
+        // 2️⃣ Si el usuario cancela, salir
+        if (!confirmacion.isConfirmed) return;
 
         // Determine winner
         let myVal = 0;
@@ -214,48 +446,201 @@ export const Challenge = () => {
 
         const iWin = myVal > oppVal;
         const tie = myVal === oppVal;
-
-        let title = '';
-        let text = '';
-        let icon: 'success' | 'error' | 'info' = 'info';
-
-        if (tie) {
-            title = 'It\'s a Tie!';
-            text = 'Great effort from both sides!';
-            icon = 'info';
-        } else if (iWin) {
-            title = 'Victory!';
-            text = `${user?.displayName} has won the challenge!`;
-            icon = 'success';
-        } else {
-            title = 'Defeat';
-            text = `${user?.displayName} has lost the challenge!`;
-            icon = 'error';
-        }
+        const winnerId = tie ? 'tie' : (iWin ? user.uid : (isAmChallenger ? currentChallenge.opponentId : currentChallenge.challengerId));
 
         try {
-            await updateDoc(doc(db, "challenges", selectedChallengeId), {
-                status: 'completed',
-                winnerId: tie ? 'tie' : (iWin ? user.uid : (currentChallenge.challengerId === user.uid ? currentChallenge.opponentId : currentChallenge.challengerId))
-            });
+            // Marcar que yo terminé
+            const updateData: any = {
+                [isAmChallenger ? 'challengerFinished' : 'opponentFinished']: true,
+            };
 
-            await Swal.fire({
-                title,
-                text,
-                icon,
-                confirmButtonText: 'Back to Dashboard',
-                background: '#1e293b',
-                color: '#fff'
-            });
+            // Si ambos terminaron, marcar como completado
+            if (hasOpponentFinished) {
+                updateData.status = 'completed';
+                updateData.winnerId = winnerId;
+            }
 
-            // Update local state
-            setActiveChallenges(prev => prev.filter(c => c.id !== selectedChallengeId));
-            setSelectedChallengeId(null);
-            setViewState('dashboard');
+            await updateDoc(doc(db, "challenges", selectedChallengeId), updateData);
+
+            // Si ambos terminaron, mostrar resultados
+            if (hasOpponentFinished) {
+                // Prepare participant data
+                const myName = user?.displayName || 'Me';
+                const myAvatar = user?.photoURL || `https://ui-avatars.com/api/?name=${myName}&background=6366f1`;
+                const oppName = selectedOpponent?.name || 'Opponent';
+                const oppAvatar = selectedOpponent?.avatar || `https://ui-avatars.com/api/?name=${oppName}&background=ec4899`;
+
+                // Format value based on goal type
+                const formatValue = (val: number) => {
+                    if (currentChallenge.goalType === 'revenue') return `$${val.toFixed(2)}`;
+                    return val.toString();
+                };
+
+                const goalLabel = currentChallenge.goalType === 'revenue' ? 'Revenue' :
+                    currentChallenge.goalType === 'lines' ? 'Lines' : 'Data';
+
+                // Show custom comparison modal
+                await Swal.fire({
+                    title: tie ? '🤝 ¡Empate!' : (iWin ? '🏆 ¡Victoria!' : '💔 Derrota'),
+                    html: `
+                        <div style="padding: 20px 10px;">
+                            <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px; margin-bottom: 30px;">
+                                <!-- Winner/Loser 1 -->
+                                <div style="flex: 1; text-align: center; position: relative;">
+                                    <div style="
+                                        width: 100px; 
+                                        height: 100px; 
+                                        margin: 0 auto 15px; 
+                                        border-radius: 50%; 
+                                        overflow: hidden;
+                                        border: 4px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
+                                        position: relative;
+                                    ">
+                                        <img src="${myAvatar}" alt="${myName}" style="width: 100%; height: 100%; object-fit: cover;" />
+                                    </div>
+                                    ${!tie ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: -10px;
+                                            left: 50%;
+                                            transform: translateX(-50%);
+                                            background: ${iWin ? '#22c55e' : '#ef4444'};
+                                            color: white;
+                                            padding: 4px 12px;
+                                            border-radius: 12px;
+                                            font-size: 12px;
+                                            font-weight: bold;
+                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                        ">
+                                            ${iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
+                                        </div>
+                                    ` : ''}
+                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${myName}</h3>
+                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
+                                    <div style="
+                                        background: ${iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
+                                        border: 1px solid ${iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+                                        border-radius: 12px;
+                                        padding: 12px;
+                                        margin-top: 10px;
+                                    ">
+                                        <div style="font-size: 28px; font-weight: bold; color: ${iWin ? '#22c55e' : '#ef4444'};">
+                                            ${formatValue(myVal)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- VS Badge -->
+                                <div style="
+                                    width: 60px;
+                                    height: 60px;
+                                    background: linear-gradient(135deg, #f97316, #ef4444);
+                                    border-radius: 50%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-weight: 900;
+                                    font-size: 20px;
+                                    color: white;
+                                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+                                    flex-shrink: 0;
+                                ">
+                                    VS
+                                </div>
+
+                                <!-- Winner/Loser 2 -->
+                                <div style="flex: 1; text-align: center; position: relative;">
+                                    <div style="
+                                        width: 100px; 
+                                        height: 100px; 
+                                        margin: 0 auto 15px; 
+                                        border-radius: 50%; 
+                                        overflow: hidden;
+                                        border: 4px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
+                                        position: relative;
+                                    ">
+                                        <img src="${oppAvatar}" alt="${oppName}" style="width: 100%; height: 100%; object-fit: cover;" />
+                                    </div>
+                                    ${!tie ? `
+                                        <div style="
+                                            position: absolute;
+                                            top: -10px;
+                                            left: 50%;
+                                            transform: translateX(-50%);
+                                            background: ${!iWin ? '#22c55e' : '#ef4444'};
+                                            color: white;
+                                            padding: 4px 12px;
+                                            border-radius: 12px;
+                                            font-size: 12px;
+                                            font-weight: bold;
+                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                        ">
+                                            ${!iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
+                                        </div>
+                                    ` : ''}
+                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${oppName}</h3>
+                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
+                                    <div style="
+                                        background: ${!iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
+                                        border: 1px solid ${!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+                                        border-radius: 12px;
+                                        padding: 12px;
+                                        margin-top: 10px;
+                                    ">
+                                        <div style="font-size: 28px; font-weight: bold; color: ${!iWin ? '#22c55e' : '#ef4444'};">
+                                            ${formatValue(oppVal)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            ${tie ?
+                            '<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
+                            `<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">
+                                    ${iWin ? '¡Felicidades! Has ganado esta batalla.' : 'Sigue esforzándote para la próxima victoria.'}
+                                </p>`
+                        }
+                        </div>
+                    `,
+                    confirmButtonText: 'Volver al Dashboard',
+                    background: '#1e293b',
+                    color: '#fff',
+                    confirmButtonColor: '#6366f1',
+                    width: '600px',
+                    showClass: {
+                        popup: 'animate__animated animate__zoomIn animate__faster'
+                    },
+                    hideClass: {
+                        popup: 'animate__animated animate__zoomOut animate__faster'
+                    }
+                });
+
+                // Update local state
+                setActiveChallenges(prev => prev.filter(c => c.id !== selectedChallengeId));
+                setSelectedChallengeId(null);
+                setViewState('dashboard');
+            } else {
+                // Solo yo terminé, mostrar mensaje de espera
+                await Swal.fire({
+                    title: '✅ Has terminado',
+                    text: 'Esperando a que tu oponente también termine para ver los resultados...',
+                    icon: 'success',
+                    background: '#1e293b',
+                    color: '#fff',
+                    confirmButtonColor: '#6366f1',
+                    confirmButtonText: 'Entendido'
+                });
+
+                // Volver al dashboard
+                setSelectedChallengeId(null);
+                setViewState('dashboard');
+            }
 
         } catch (error) {
             console.error("Error completing challenge:", error);
-            Swal.fire('Error', 'Could not complete challenge', 'error');
+            Swal.fire('Error', 'No se pudo completar la batalla', 'error');
         }
     }
 
