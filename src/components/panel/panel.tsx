@@ -190,6 +190,7 @@ export default function PanelVentas() {
                 {userInfo.displayName}
               </span>
             </p>
+
           </div>
 
           {/* navbar */}

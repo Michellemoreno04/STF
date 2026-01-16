@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Swords, Trophy, Target, Check } from "lucide-react";
-import { collection, doc, getDocs, onSnapshot, addDoc, updateDoc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../panel/auth/authContext";
 import Swal from "sweetalert2";
@@ -55,6 +55,9 @@ export const Challenge = () => {
     const [myStats, setMyStats] = useState<DailyStats>({ revenue: 0, lines: 0, data: 0 });
     const [opponentStats, setOpponentStats] = useState<DailyStats>({ revenue: 0, lines: 0, data: 0 });
 
+    const currentChallenge = activeChallenges.find(c => c.id === selectedChallengeId);
+    const isAmChallenger = user && currentChallenge ? currentChallenge.challengerId === user.uid : false;
+
     useEffect(() => {
         const fetchUsers = async () => {
             try {
@@ -80,53 +83,73 @@ export const Challenge = () => {
             }
         };
 
-        const checkActiveChallenges = async () => {
-            if (!user) return;
-            const todayDate = new Date().toISOString().split('T')[0];
+        if (!user) return;
 
-            // Check if I am challenger or opponent in an active challenge for today
-            const challengesRef = collection(db, "challenges");
+        fetchUsers();
 
-            // Query 1: I am challenger
-            const q1 = query(
-                challengesRef,
-                where("challengerId", "==", user.uid),
-                where("date", "==", todayDate),
-                where("status", "in", ["pending", "accepted"])
-            );
+        const todayDate = new Date().toISOString().split('T')[0];
+        const challengesRef = collection(db, "challenges");
 
-            // Query 2: I am opponent
-            const q2 = query(
-                challengesRef,
-                where("opponentId", "==", user.uid),
-                where("date", "==", todayDate),
-                where("status", "in", ["pending", "accepted"])
-            );
+        // Query 1: I am challenger
+        const q1 = query(
+            challengesRef,
+            where("challengerId", "==", user.uid),
+            where("date", "==", todayDate),
+            where("status", "in", ["pending", "accepted"])
+        );
 
-            // Accessing Firestore multiple times in parallel
-            const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+        // Query 2: I am opponent
+        const q2 = query(
+            challengesRef,
+            where("opponentId", "==", user.uid),
+            where("date", "==", todayDate),
+            where("status", "in", ["pending", "accepted"])
+        );
 
-            const challengesMap = new Map<string, ChallengeData>();
+        // Real-time listeners
+        const unsub1 = onSnapshot(q1, (snap1) => {
+            const challenges1 = snap1.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChallengeData));
 
-            snap1.forEach(doc => {
-                challengesMap.set(doc.id, { id: doc.id, ...doc.data() } as ChallengeData);
-            });
-            snap2.forEach(doc => {
-                challengesMap.set(doc.id, { id: doc.id, ...doc.data() } as ChallengeData);
-            });
+            // We need to merge with q2 results, but q2 is in another listener.
+            // Best approach: Store them in separate states or a ref, or merge in a single state update
+            // Since we can't easily sync two listeners into one state without potential race conditions or complexity,
+            // we will use a functional update that filters out old items from this "source" and adds new ones?
+            // Easier: just fetch q2 in the same callback? No, that's not real-time.
+            // BETTER: Use a single "updates" object or separate state vars.
+            // Let's use `challengerChallenges` and `opponentChallenges` states and combine them.
+            // For now, let's keep it simple: combined list in one state might be tricky with 2 listeners.
+            // Let's try to set state by merging.
 
-            const allChallenges = Array.from(challengesMap.values());
-            setActiveChallenges(allChallenges);
+            // Actually, we can just trigger a manual merge if we store the snapshots?
+            // Let's modify the state structure? No, too much refactor.
+            // Let's use a ref to hold the latest lists and update state.
+            updateChallenges('challenger', challenges1);
+        });
 
-            // If we are navigating from a notification (optional enhancement later), we could auto-select
-            // For now, default to dashboard
-            setViewState('dashboard');
+        const unsub2 = onSnapshot(q2, (snap2) => {
+            const challenges2 = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChallengeData));
+            updateChallenges('opponent', challenges2);
+        });
+
+        // Helper to merge
+        let challengesMap: Record<string, ChallengeData[]> = {
+            challenger: [],
+            opponent: []
         };
 
-        if (user) {
-            fetchUsers();
-            checkActiveChallenges();
-        }
+        const updateChallenges = (source: 'challenger' | 'opponent', list: ChallengeData[]) => {
+            challengesMap[source] = list;
+            // Deduplicate just in case? IDs should be unique across these queries normally (can't be both challenger and opponent in same doc usually)
+            const combined = [...challengesMap.challenger, ...challengesMap.opponent];
+            // Sort by date/created?
+            setActiveChallenges(combined);
+        };
+
+        return () => {
+            unsub1();
+            unsub2();
+        };
+
     }, [user]);
 
     useEffect(() => {
@@ -231,139 +254,80 @@ export const Challenge = () => {
                 const oppName = selectedOpponent?.name || 'Opponent';
                 const oppAvatar = selectedOpponent?.avatar || `https://ui-avatars.com/api/?name=${oppName}&background=ec4899`;
 
-                // Format value based on goal type
-                const formatValue = (val: number) => {
-                    if (challengeData.goalType === 'revenue') return `$${val.toFixed(2)}`;
-                    return val.toString();
-                };
+                // Prepare metrics and sort by goal type
+                const metrics = [
+                    { id: 'revenue', label: 'Revenue', my: myStats.revenue, opp: opponentStats.revenue, format: (v: number) => `$${v.toFixed(2)}` },
+                    { id: 'lines', label: 'Lines', my: myStats.lines, opp: opponentStats.lines, format: (v: number) => v.toString() },
+                    { id: 'data', label: 'Data', my: myStats.data, opp: opponentStats.data, format: (v: number) => v.toString() }
+                ].sort((a, b) => {
+                    if (a.id === challengeData.goalType) return -1;
+                    if (b.id === challengeData.goalType) return 1;
+                    return 0;
+                });
 
-                const goalLabel = challengeData.goalType === 'revenue' ? 'Revenue' :
-                    challengeData.goalType === 'lines' ? 'Lines' : 'Data';
+                const renderStats = (isMe: boolean) => {
+                    return metrics.map(m => {
+                        const val = isMe ? m.my : m.opp;
+                        const isGoal = m.id === challengeData.goalType;
+
+                        return `
+                        <div style="margin-bottom: 8px; padding: 4px; ${isGoal ? 'background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px;' : ''}">
+                            <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">${m.label}</div>
+                            <div style="font-size: ${isGoal ? '20px' : '16px'}; font-weight: bold; color: ${isGoal ? (isMe ? (iWin ? '#22c55e' : '#ef4444') : (!iWin ? '#22c55e' : '#ef4444')) : '#ffffff'};">
+                                ${m.format(val)}
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                };
 
                 // Show custom comparison modal
                 await Swal.fire({
                     title: tie ? '🤝 ¡Empate!' : (iWin ? '🏆 ¡Victoria!' : '💔 Derrota'),
                     html: `
-                        <div style="padding: 20px 10px;">
-                            <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px; margin-bottom: 30px;">
-                                <!-- Winner/Loser 1 -->
-                                <div style="flex: 1; text-align: center; position: relative;">
+                        <div style="padding: 20px 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                                <!-- Me -->
+                                <div style="flex: 1; text-align: center;">
                                     <div style="
-                                        width: 100px; 
-                                        height: 100px; 
-                                        margin: 0 auto 15px; 
-                                        border-radius: 50%; 
-                                        overflow: hidden;
-                                        border: 4px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
-                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
-                                        position: relative;
+                                        width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 50%; overflow: hidden;
+                                        border: 3px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 15px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)')};
                                     ">
                                         <img src="${myAvatar}" alt="${myName}" style="width: 100%; height: 100%; object-fit: cover;" />
                                     </div>
-                                    ${!tie ? `
-                                        <div style="
-                                            position: absolute;
-                                            top: -10px;
-                                            left: 50%;
-                                            transform: translateX(-50%);
-                                            background: ${iWin ? '#22c55e' : '#ef4444'};
-                                            color: white;
-                                            padding: 4px 12px;
-                                            border-radius: 12px;
-                                            font-size: 12px;
-                                            font-weight: bold;
-                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                        ">
-                                            ${iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
-                                        </div>
-                                    ` : ''}
-                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${myName}</h3>
-                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
-                                    <div style="
-                                        background: ${iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                                        border: 1px solid ${iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
-                                        border-radius: 12px;
-                                        padding: 12px;
-                                        margin-top: 10px;
-                                    ">
-                                        <div style="font-size: 28px; font-weight: bold; color: ${iWin ? '#22c55e' : '#ef4444'};">
-                                            ${formatValue(myVal)}
-                                        </div>
-                                    </div>
+                                    <h3 style="color: #fff; font-size: 16px; font-weight: bold; margin-bottom: 15px;">${myName}</h3>
+                                    
+                                    ${renderStats(true)}
                                 </div>
 
-                                <!-- VS Badge -->
-                                <div style="
-                                    width: 60px;
-                                    height: 60px;
-                                    background: linear-gradient(135deg, #f97316, #ef4444);
-                                    border-radius: 50%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-weight: 900;
-                                    font-size: 20px;
-                                    color: white;
-                                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-                                    flex-shrink: 0;
-                                ">
-                                    VS
+                                <!-- VS -->
+                                <div style="padding-top: 30px; width: 40px; text-align: center;">
+                                    <div style="font-weight: 900; font-size: 16px; color: #64748b;">VS</div>
                                 </div>
 
-                                <!-- Winner/Loser 2 -->
-                                <div style="flex: 1; text-align: center; position: relative;">
+                                <!-- Opponent -->
+                                <div style="flex: 1; text-align: center;">
                                     <div style="
-                                        width: 100px; 
-                                        height: 100px; 
-                                        margin: 0 auto 15px; 
-                                        border-radius: 50%; 
-                                        overflow: hidden;
-                                        border: 4px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
-                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
-                                        position: relative;
+                                        width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 50%; overflow: hidden;
+                                        border: 3px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 15px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)')};
                                     ">
                                         <img src="${oppAvatar}" alt="${oppName}" style="width: 100%; height: 100%; object-fit: cover;" />
                                     </div>
-                                    ${!tie ? `
-                                        <div style="
-                                            position: absolute;
-                                            top: -10px;
-                                            left: 50%;
-                                            transform: translateX(-50%);
-                                            background: ${!iWin ? '#22c55e' : '#ef4444'};
-                                            color: white;
-                                            padding: 4px 12px;
-                                            border-radius: 12px;
-                                            font-size: 12px;
-                                            font-weight: bold;
-                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                        ">
-                                            ${!iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
-                                        </div>
-                                    ` : ''}
-                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${oppName}</h3>
-                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
-                                    <div style="
-                                        background: ${!iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                                        border: 1px solid ${!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
-                                        border-radius: 12px;
-                                        padding: 12px;
-                                        margin-top: 10px;
-                                    ">
-                                        <div style="font-size: 28px; font-weight: bold; color: ${!iWin ? '#22c55e' : '#ef4444'};">
-                                            ${formatValue(oppVal)}
-                                        </div>
-                                    </div>
+                                    <h3 style="color: #fff; font-size: 16px; font-weight: bold; margin-bottom: 15px;">${oppName}</h3>
+
+                                    ${renderStats(false)}
                                 </div>
                             </div>
 
     ${tie ?
-                            '<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
-                            `<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">
+                            '<p style="color: #94a3b8; font-size: 14px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
+                            `<p style="color: #94a3b8; font-size: 14px; margin-top: 20px;">
                                     ${iWin ? '¡Felicidades! Has ganado esta batalla.' : 'Sigue esforzándote para la próxima victoria.'}
                                 </p>`
                         }
-                        </div >
+                        </div>
     `,
                     confirmButtonText: 'Volver al Dashboard',
                     background: '#1e293b',
@@ -470,135 +434,76 @@ export const Challenge = () => {
                 const oppName = selectedOpponent?.name || 'Opponent';
                 const oppAvatar = selectedOpponent?.avatar || `https://ui-avatars.com/api/?name=${oppName}&background=ec4899`;
 
-                // Format value based on goal type
-                const formatValue = (val: number) => {
-                    if (currentChallenge.goalType === 'revenue') return `$${val.toFixed(2)}`;
-                    return val.toString();
-                };
+                // Prepare metrics and sort by goal type
+                const metrics = [
+                    { id: 'revenue', label: 'Revenue', my: myStats.revenue, opp: opponentStats.revenue, format: (v: number) => `$${v.toFixed(2)}` },
+                    { id: 'lines', label: 'Lines', my: myStats.lines, opp: opponentStats.lines, format: (v: number) => v.toString() },
+                    { id: 'data', label: 'Data', my: myStats.data, opp: opponentStats.data, format: (v: number) => v.toString() }
+                ].sort((a, b) => {
+                    if (a.id === currentChallenge.goalType) return -1;
+                    if (b.id === currentChallenge.goalType) return 1;
+                    return 0;
+                });
 
-                const goalLabel = currentChallenge.goalType === 'revenue' ? 'Revenue' :
-                    currentChallenge.goalType === 'lines' ? 'Lines' : 'Data';
+                const renderStats = (isMe: boolean) => {
+                    return metrics.map(m => {
+                        const val = isMe ? m.my : m.opp;
+                        const isGoal = m.id === currentChallenge.goalType;
+
+                        return `
+                        <div style="margin-bottom: 8px; padding: 4px; ${isGoal ? 'background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px;' : ''}">
+                            <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">${m.label}</div>
+                            <div style="font-size: ${isGoal ? '20px' : '16px'}; font-weight: bold; color: ${isGoal ? (isMe ? (iWin ? '#22c55e' : '#ef4444') : (!iWin ? '#22c55e' : '#ef4444')) : '#ffffff'};">
+                                ${m.format(val)}
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                };
 
                 // Show custom comparison modal
                 await Swal.fire({
                     title: tie ? '🤝 ¡Empate!' : (iWin ? '🏆 ¡Victoria!' : '💔 Derrota'),
                     html: `
-                        <div style="padding: 20px 10px;">
-                            <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px; margin-bottom: 30px;">
-                                <!-- Winner/Loser 1 -->
-                                <div style="flex: 1; text-align: center; position: relative;">
+                        <div style="padding: 20px 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                                <!-- Me -->
+                                <div style="flex: 1; text-align: center;">
                                     <div style="
-                                        width: 100px; 
-                                        height: 100px; 
-                                        margin: 0 auto 15px; 
-                                        border-radius: 50%; 
-                                        overflow: hidden;
-                                        border: 4px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
-                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
-                                        position: relative;
+                                        width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 50%; overflow: hidden;
+                                        border: 3px solid ${tie ? '#94a3b8' : (iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 15px ${tie ? 'rgba(148, 163, 184, 0.3)' : (iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)')};
                                     ">
                                         <img src="${myAvatar}" alt="${myName}" style="width: 100%; height: 100%; object-fit: cover;" />
                                     </div>
-                                    ${!tie ? `
-                                        <div style="
-                                            position: absolute;
-                                            top: -10px;
-                                            left: 50%;
-                                            transform: translateX(-50%);
-                                            background: ${iWin ? '#22c55e' : '#ef4444'};
-                                            color: white;
-                                            padding: 4px 12px;
-                                            border-radius: 12px;
-                                            font-size: 12px;
-                                            font-weight: bold;
-                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                        ">
-                                            ${iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
-                                        </div>
-                                    ` : ''}
-                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${myName}</h3>
-                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
-                                    <div style="
-                                        background: ${iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                                        border: 1px solid ${iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
-                                        border-radius: 12px;
-                                        padding: 12px;
-                                        margin-top: 10px;
-                                    ">
-                                        <div style="font-size: 28px; font-weight: bold; color: ${iWin ? '#22c55e' : '#ef4444'};">
-                                            ${formatValue(myVal)}
-                                        </div>
-                                    </div>
+                                    <h3 style="color: #fff; font-size: 16px; font-weight: bold; margin-bottom: 15px;">${myName}</h3>
+                                    
+                                    ${renderStats(true)}
                                 </div>
 
-                                <!-- VS Badge -->
-                                <div style="
-                                    width: 60px;
-                                    height: 60px;
-                                    background: linear-gradient(135deg, #f97316, #ef4444);
-                                    border-radius: 50%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-weight: 900;
-                                    font-size: 20px;
-                                    color: white;
-                                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-                                    flex-shrink: 0;
-                                ">
-                                    VS
+                                <!-- VS -->
+                                <div style="padding-top: 30px; width: 40px; text-align: center;">
+                                    <div style="font-weight: 900; font-size: 16px; color: #64748b;">VS</div>
                                 </div>
 
-                                <!-- Winner/Loser 2 -->
-                                <div style="flex: 1; text-align: center; position: relative;">
+                                <!-- Opponent -->
+                                <div style="flex: 1; text-align: center;">
                                     <div style="
-                                        width: 100px; 
-                                        height: 100px; 
-                                        margin: 0 auto 15px; 
-                                        border-radius: 50%; 
-                                        overflow: hidden;
-                                        border: 4px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
-                                        box-shadow: 0 0 20px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.3)')};
-                                        position: relative;
+                                        width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 50%; overflow: hidden;
+                                        border: 3px solid ${tie ? '#94a3b8' : (!iWin ? '#22c55e' : '#ef4444')};
+                                        box-shadow: 0 0 15px ${tie ? 'rgba(148, 163, 184, 0.3)' : (!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)')};
                                     ">
                                         <img src="${oppAvatar}" alt="${oppName}" style="width: 100%; height: 100%; object-fit: cover;" />
                                     </div>
-                                    ${!tie ? `
-                                        <div style="
-                                            position: absolute;
-                                            top: -10px;
-                                            left: 50%;
-                                            transform: translateX(-50%);
-                                            background: ${!iWin ? '#22c55e' : '#ef4444'};
-                                            color: white;
-                                            padding: 4px 12px;
-                                            border-radius: 12px;
-                                            font-size: 12px;
-                                            font-weight: bold;
-                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                        ">
-                                            ${!iWin ? '👑 GANADOR' : '😔 PERDEDOR'}
-                                        </div>
-                                    ` : ''}
-                                    <h3 style="color: #fff; font-size: 18px; font-weight: bold; margin: 10px 0 5px;">${oppName}</h3>
-                                    <p style="color: #94a3b8; font-size: 14px; margin: 0 0 10px;">${goalLabel}</p>
-                                    <div style="
-                                        background: ${!iWin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                                        border: 1px solid ${!iWin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
-                                        border-radius: 12px;
-                                        padding: 12px;
-                                        margin-top: 10px;
-                                    ">
-                                        <div style="font-size: 28px; font-weight: bold; color: ${!iWin ? '#22c55e' : '#ef4444'};">
-                                            ${formatValue(oppVal)}
-                                        </div>
-                                    </div>
+                                    <h3 style="color: #fff; font-size: 16px; font-weight: bold; margin-bottom: 15px;">${oppName}</h3>
+
+                                    ${renderStats(false)}
                                 </div>
                             </div>
 
-                            ${tie ?
-                            '<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
-                            `<p style="color: #94a3b8; font-size: 16px; margin-top: 20px;">
+    ${tie ?
+                            '<p style="color: #94a3b8; font-size: 14px; margin-top: 20px;">¡Gran esfuerzo de ambos lados!</p>' :
+                            `<p style="color: #94a3b8; font-size: 14px; margin-top: 20px;">
                                     ${iWin ? '¡Felicidades! Has ganado esta batalla.' : 'Sigue esforzándote para la próxima victoria.'}
                                 </p>`
                         }
@@ -633,9 +538,9 @@ export const Challenge = () => {
                     confirmButtonText: 'Entendido'
                 });
 
-                // Volver al dashboard
-                setSelectedChallengeId(null);
-                setViewState('dashboard');
+                // NO volver al dashboard, quedarse esperando
+                // setSelectedChallengeId(null);
+                // setViewState('dashboard');
             }
 
         } catch (error) {
@@ -728,8 +633,16 @@ export const Challenge = () => {
             const newChallenge = { id: docRef.id, ...challengeData, status: 'pending', date: todayDate } as any;
 
             setActiveChallenges(prev => [...prev, newChallenge]);
-            setSelectedChallengeId(docRef.id);
-            setViewState('arena');
+
+            await Swal.fire({
+                title: 'Desafío Enviado',
+                text: 'Esperando a que tu oponente acepte el desafío.',
+                icon: 'success',
+                confirmButtonColor: '#6366f1',
+                background: '#1e293b',
+                color: '#fff'
+            });
+            setViewState('dashboard');
         } catch (error) {
             console.error("Error sending challenge:", error);
         } finally {
@@ -781,7 +694,80 @@ export const Challenge = () => {
                                 return (
                                     <div
                                         key={challenge.id}
-                                        onClick={() => {
+                                        onClick={async () => {
+                                            if (challenge.status === 'pending') {
+                                                if (isAmChallenger) {
+                                                    Swal.fire({
+                                                        title: '⏳ Esperando respuesta',
+                                                        text: `Esperando a que ${opponentName} acepte el desafío.`,
+                                                        icon: 'info',
+                                                        background: '#1e293b',
+                                                        color: '#fff',
+                                                        confirmButtonColor: '#6366f1',
+                                                    });
+                                                } else {
+                                                    // I am the opponent, ask to accept
+                                                    const result = await Swal.fire({
+                                                        title: `⚔️ Desafío de ${challenge.challengerName}`,
+                                                        text: `Goal: ${challenge.goalType.toUpperCase()}`,
+                                                        imageUrl: challenge.challengerAvatar,
+                                                        imageWidth: 80,
+                                                        imageHeight: 80,
+                                                        imageAlt: 'Challenger Avatar',
+                                                        showCancelButton: true,
+                                                        showDenyButton: true,
+                                                        confirmButtonText: '🔥 Aceptar',
+                                                        denyButtonText: 'Rechazar',
+                                                        cancelButtonText: 'Cancelar',
+                                                        background: '#1e293b',
+                                                        color: '#fff',
+                                                        confirmButtonColor: '#22c55e',
+                                                        denyButtonColor: '#ef4444',
+                                                        cancelButtonColor: '#64748b',
+                                                        customClass: {
+                                                            image: 'rounded-full border-4 border-indigo-500'
+                                                        }
+                                                    });
+
+                                                    if (result.isConfirmed) {
+                                                        try {
+                                                            await updateDoc(doc(db, "challenges", challenge.id), {
+                                                                status: 'accepted'
+                                                            });
+                                                            Swal.fire({
+                                                                title: '¡Desafío Aceptado!',
+                                                                text: 'Que comience la batalla',
+                                                                icon: 'success',
+                                                                timer: 1500,
+                                                                showConfirmButton: false,
+                                                                background: '#1e293b',
+                                                                color: '#fff'
+                                                            });
+                                                            setSelectedChallengeId(challenge.id);
+                                                            setViewState('arena');
+                                                        } catch (error) {
+                                                            console.error("Error accepting", error);
+                                                        }
+                                                    } else if (result.isDenied) {
+                                                        try {
+                                                            await deleteDoc(doc(db, "challenges", challenge.id)); // Delete if declined
+                                                            Swal.fire({
+                                                                title: 'Desafío Rechazado',
+                                                                icon: 'info',
+                                                                timer: 1500,
+                                                                showConfirmButton: false,
+                                                                background: '#1e293b',
+                                                                color: '#fff'
+                                                            });
+                                                        } catch (error) {
+                                                            console.error("Error deleting", error);
+                                                        }
+                                                    }
+                                                }
+                                                return; // Do not enter arena directly
+                                            }
+
+                                            // If accepted, enter arena
                                             setSelectedChallengeId(challenge.id);
                                             setViewState('arena');
                                         }}
@@ -1002,7 +988,13 @@ export const Challenge = () => {
                                 oppVal={opponentStats.data}
                             />
                         </div>
-
+                        {
+                            isAmChallenger ? currentChallenge?.challengerFinished : currentChallenge?.opponentFinished ? (
+                                <p className="text-center text-white mb-2 text-yellow-500  drop-shadow-[0_0_10px_rgba(255,255,0,0.5)] ">Esperemos a que el oponente termine la batalla para ver los resultados.</p>
+                            ) : (
+                                <p>''</p>
+                            )
+                        }
                         <div className="text-center">
                             <button
                                 onClick={() => {
@@ -1015,10 +1007,16 @@ export const Challenge = () => {
                                 Back to Dashboard
                             </button>
                             <button
-                                className="px-6 py-2 cursor-pointer rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors text-sm font-medium"
+                                className={`px-6 py-2 cursor-pointer rounded-xl transition-colors text-sm font-medium ${(isAmChallenger ? currentChallenge?.challengerFinished : currentChallenge?.opponentFinished)
+                                    ? 'bg-yellow-500/20 text-yellow-500 cursor-not-allowed'
+                                    : 'bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white'
+                                    }`}
                                 onClick={terminarBattle}
+                                disabled={!!(isAmChallenger ? currentChallenge?.challengerFinished : currentChallenge?.opponentFinished)}
                             >
-                                Terminar Battle
+                                {(isAmChallenger ? currentChallenge?.challengerFinished : currentChallenge?.opponentFinished)
+                                    ? 'Waiting for opponent...'
+                                    : 'Terminar Battle'}
                             </button>
                         </div>
                     </div>
