@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, RadarIcon } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -12,6 +12,7 @@ import { useEffect, useState, useCallback } from "react";
 import { RankingComponente } from "./ranking/rankingComponente";
 import { useNavigate } from "react-router-dom";
 import { Check, X, Swords } from "lucide-react";
+import { AlarmClock } from "./alarm/AlarmClock";
 
 export default function PanelVentas() {
   const { user, logout } = useAuth();
@@ -200,35 +201,51 @@ export default function PanelVentas() {
                 to="/daily-ranking"
                 className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
               >
-                Daily Ranking
+                <div className="flex flex-col items-center gap-2">
+                  <RadarIcon />
+                  <p className="text-sm">Daily Ranking</p>
+                </div>
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
               </Link>
               <Link
                 to="/challenge"
                 className="text-indigo-100 font-medium hover:text-white cursor-pointer transition-colors relative group"
               >
-                Challenge a friend
+                <div className="flex flex-col items-center gap-2">
+                  <Trophy />
+                  <p className="text-sm">Challenge a friend</p>
+                </div>
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
               </Link>
               <Link
                 to="/previous-months"
                 className="text-indigo-100 font-medium hover:text-white cursor-pointer transition-colors relative group"
               >
-                Previous Months
+                <div className="flex flex-col items-center gap-2">
+                  <Calendar />
+                  <p className="text-sm">Previous Months</p>
+                </div>
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
               </Link>
 
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <Bell size={20} className={showNotifications ? 'text-white' : 'text-indigo-100'} />
-                  {pendingChallenges.length > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-indigo-500 animate-pulse"></span>
-                  )}
-                </button>
+              <AlarmClock />
 
+
+              <div className="relative">
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="relative p-2 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <Bell size={20} className={showNotifications ? 'text-white' : 'text-indigo-100'} />
+                    {pendingChallenges.length > 0 && (
+                      <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-indigo-500 animate-pulse"></span>
+                    )}
+
+                  </button>
+                  <p className="text-sm text-indigo-100">Notifications</p>
+
+                </div>
                 {showNotifications && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
