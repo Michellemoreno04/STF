@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { db } from "../../firebase";
-import { collection, onSnapshot, query, collectionGroup, doc, updateDoc, addDoc, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, collectionGroup, doc, updateDoc, addDoc, orderBy, deleteDoc } from "firebase/firestore";
 import { useAuth } from "../panel/auth/authContext";
-import { Trophy, TrendingUp, ArrowLeft, Plus, Users, Target, Rocket } from "lucide-react";
+import { Trophy, TrendingUp, ArrowLeft, Plus, Users, Target, Rocket, Minus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 
 interface DailyRankingUser {
     id: string;
@@ -186,6 +187,31 @@ export const DailyRanking = () => {
         }
     };
 
+    const deleteGroup = async (groupId: string) => {
+        if (!user) return;
+        try {
+            const confirm = await Swal.fire({
+                title: "Are you sure you want to delete this group?",
+                text: "All users in this group will be removed from the group.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#ef4444",
+                cancelButtonColor: "#6b7280",
+                confirmButtonText: "Yes, delete it!"
+            });
+            if (!confirm.isConfirmed) return;
+
+
+
+            const groupRef = doc(db, "rankingGroups", groupId);
+            await deleteDoc(groupRef);
+            setUserGroupId(null);
+            setSelectedGroupId('global');
+        } catch (error) {
+            console.error("Error deleting group:", error);
+        }
+    };
+
     const currentUserRank = users.findIndex(u => u.id === user?.uid) + 1;
     const currentUserData = users.find(u => u.id === user?.uid);
 
@@ -276,13 +302,13 @@ export const DailyRanking = () => {
                                 >
                                     {group.name}
                                 </button>
-                                {userGroupId !== group.id && (
+                                {group.createdBy === user?.uid && (
                                     <button
-                                        onClick={() => handleJoinGroup(group.id)}
-                                        className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                        title="Join this group"
+                                        onClick={() => deleteGroup(group.id)}
+                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 cursor-pointer rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                        title="Delete this group"
                                     >
-                                        <Plus size={14} className="text-[#0f172a]" />
+                                        <Minus size={14} className="text-[#0f172a]" />
                                     </button>
                                 )}
                             </div>

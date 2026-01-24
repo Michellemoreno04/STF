@@ -11,6 +11,7 @@ import { db } from './firebase'
 import Swal from 'sweetalert2'
 import { useNavigate, Routes, Route } from 'react-router-dom'
 import { PassMonth } from './components/panel/statCard/previousMonths'
+import { AlarmClock } from './components/panel/alarm/AlarmClock'
 
 
 function App() {
@@ -82,6 +83,7 @@ function Router() {
       <Route path="/previous-months" element={<PassMonth />} />
       <Route path="/challenge" element={<Challenge />} />
       <Route path="/daily-ranking" element={<DailyRanking />} />
+      <Route path="/alarm" element={<AlarmClock />} />
     </Routes>
   )
 }

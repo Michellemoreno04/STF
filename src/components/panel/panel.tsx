@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, RadarIcon } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, RadarIcon, BellRing } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -198,6 +198,16 @@ export default function PanelVentas() {
           <div className="flex items-center gap-6 mt-4 md:mt-0 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-lg">
             <nav className="flex items-center gap-6 mr-4">
               <Link
+                to="/alarm"
+                className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <BellRing />
+                  <p className="text-sm">set an alarm</p>
+                </div>
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
+              </Link>
+              <Link
                 to="/daily-ranking"
                 className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
               >
@@ -228,7 +238,6 @@ export default function PanelVentas() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
               </Link>
 
-              <AlarmClock />
 
 
               <div className="relative">
