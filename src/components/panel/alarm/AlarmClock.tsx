@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, X, Bell, BellRing, BellOff, Type, AlignLeft, ArrowLeft, Plus, Save, Trash2, Volume2, Calendar } from 'lucide-react';
+import { X, BellRing, BellOff, Type, ArrowLeft, Plus, Save, Trash2, Volume2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import alarmSound from '../../../assets/sounds/alarm.mp3';
@@ -106,6 +106,28 @@ export function AlarmClock() {
     useEffect(() => {
         localStorage.setItem('alarmsData', JSON.stringify(alarms));
     }, [alarms]);
+
+    // Update document title when alarm is ringing
+    useEffect(() => {
+        let interval: any;
+        if (ringingAlarmId) {
+            const ringingAlarm = alarms.find(a => a.id === ringingAlarmId);
+            const baseTitle = ringingAlarm?.title ? `⏰ ${ringingAlarm.title}` : '⏰ Alarm Ringing!';
+
+            let showEmoji = true;
+            interval = setInterval(() => {
+                document.title = showEmoji ? baseTitle : 'STF Panel';
+                showEmoji = !showEmoji;
+            }, 1000);
+        } else {
+            document.title = 'STF Panel';
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+            document.title = 'STF Panel';
+        };
+    }, [ringingAlarmId, alarms]);
 
     // Alarm Checker Interval
     useEffect(() => {

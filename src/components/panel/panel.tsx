@@ -12,7 +12,6 @@ import { useEffect, useState, useCallback } from "react";
 import { RankingComponente } from "./ranking/rankingComponente";
 import { useNavigate } from "react-router-dom";
 import { Check, X, Swords } from "lucide-react";
-import { AlarmClock } from "./alarm/AlarmClock";
 
 export default function PanelVentas() {
   const { user, logout } = useAuth();
