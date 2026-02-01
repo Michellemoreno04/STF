@@ -112,6 +112,14 @@ export function AlarmClock() {
         return `${diffHours}h ${diffMinutes}m`;
     };
 
+    // Helper to convert 24-hour format to 12-hour format with AM/PM
+    const formatTime12Hour = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
+        return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    };
+
     return (
         <div className="min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30 font-sans relative overflow-hidden flex flex-col">
             {/* Ambient Background */}
@@ -255,7 +263,7 @@ export function AlarmClock() {
                                                     <div className="flex-1">
                                                         <div className="flex items-center gap-3">
                                                             <span className={`text-3xl font-mono font-bold ${alarm.isActive ? 'text-white' : 'text-slate-400'}`}>
-                                                                {alarm.time}
+                                                                {formatTime12Hour(alarm.time)}
                                                             </span>
                                                             {alarm.isActive && (
                                                                 <span className="text-xs font-medium text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
