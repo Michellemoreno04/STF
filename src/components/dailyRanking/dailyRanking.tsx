@@ -11,6 +11,10 @@ interface DailyRankingUser {
     name: string;
     lines: number;
     data: number;
+    devices: number;
+    asurion: number;
+    tv: number;
+    phone: number;
     revenue: number;
     avatar: string;
     groupId?: string;
@@ -92,7 +96,11 @@ export const DailyRanking = () => {
 
     // Fetch daily stats (Real-time)
     useEffect(() => {
-        const todayDate = new Date().toISOString().split('T')[0];
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const todayDate = `${year}-${month}-${day}`;
         const q = query(collectionGroup(db, 'daily_stats'));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -126,8 +134,12 @@ export const DailyRanking = () => {
                     name: userProfiles[userId].name,
                     avatar: userProfiles[userId].avatar,
                     groupId: userProfiles[userId].groupId,
-                    lines: stats?.totalLines || 0,
-                    data: stats?.totalInternet || 0,
+                    lines: stats?.lines || 0,
+                    data: stats?.data || 0,
+                    devices: stats?.devices || 0,
+                    asurion: stats?.asurion || 0,
+                    tv: stats?.tv || 0,
+                    phone: stats?.phone || 0,
                     revenue: stats?.revenue || 0
                 };
             });
@@ -341,6 +353,22 @@ export const DailyRanking = () => {
                                                 <p className="text-indigo-200 text-[10px] uppercase font-bold mb-1">Data</p>
                                                 <p className="text-xl font-black">{currentUserData.data}</p>
                                             </div>
+                                            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                                                <p className="text-indigo-200 text-[10px] uppercase font-bold mb-1">Devices</p>
+                                                <p className="text-xl font-black">{currentUserData.devices}</p>
+                                            </div>
+                                            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                                                <p className="text-indigo-200 text-[10px] uppercase font-bold mb-1">Asurion</p>
+                                                <p className="text-xl font-black">{currentUserData.asurion}</p>
+                                            </div>
+                                            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                                                <p className="text-indigo-200 text-[10px] uppercase font-bold mb-1">Tv</p>
+                                                <p className="text-xl font-black">{currentUserData.tv}</p>
+                                            </div>
+                                            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                                                <p className="text-indigo-200 text-[10px] uppercase font-bold mb-1">Phone</p>
+                                                <p className="text-xl font-black">{currentUserData.phone}</p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -463,8 +491,8 @@ export const DailyRanking = () => {
                                                     </div>
 
                                                     {/* Main Stat */}
-                                                    <div className="flex items-center gap-4 md:gap-8">
-                                                        <div className="flex gap-3 md:gap-6">
+                                                    <div className="flex items-center gap-4 md:gap-8 overflow-x-auto pb-2 custom-scrollbar">
+                                                        <div className="flex gap-3 md:gap-6 shrink-0">
                                                             <div className="text-center">
                                                                 <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Lines</p>
                                                                 <p className="text-sm md:text-md font-bold text-indigo-400">{rankUser.lines}</p>
@@ -473,8 +501,24 @@ export const DailyRanking = () => {
                                                                 <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Data</p>
                                                                 <p className="text-sm md:text-md font-bold text-purple-400">{rankUser.data}</p>
                                                             </div>
+                                                            <div className="text-center">
+                                                                <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Dev.</p>
+                                                                <p className="text-sm md:text-md font-bold text-blue-400">{rankUser.devices}</p>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Asur.</p>
+                                                                <p className="text-sm md:text-md font-bold text-green-400">{rankUser.asurion}</p>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Tv</p>
+                                                                <p className="text-sm md:text-md font-bold text-orange-400">{rankUser.tv}</p>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <p className="text-[10px] uppercase font-bold text-white/40 mb-1">Ph.</p>
+                                                                <p className="text-sm md:text-md font-bold text-rose-400">{rankUser.phone}</p>
+                                                            </div>
                                                         </div>
-                                                        <div className="bg-white/5 px-4 md:px-6 py-2 md:py-3 rounded-2xl border border-white/5 min-w-[90px] md:min-w-[120px] text-right">
+                                                        <div className="bg-white/5 px-4 md:px-6 py-2 md:py-3 rounded-2xl border border-white/5 min-w-[90px] md:min-w-[120px] text-right shrink-0">
                                                             <p className="text-[10px] uppercase font-bold text-white/40 leading-tight">Revenue</p>
                                                             <p className="text-lg md:text-xl font-black text-indigo-400">${rankUser.revenue.toLocaleString()}</p>
                                                         </div>

@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, RadarIcon, BellRing } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, BellRing, Flag } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -35,6 +35,12 @@ export default function PanelVentas() {
     revenue: 0,
     phone: 0,
     dailyRevenue: 0,
+    dailyLines: 0,
+    dailyData: 0,
+    dailyDevices: 0,
+    dailyAsurion: 0,
+    dailyTv: 0,
+    dailyPhone: 0,
   });
 
   const fetchStats = useCallback(async () => {
@@ -50,11 +56,23 @@ export default function PanelVentas() {
     const todayDate = `${year}-${month}-${day}`;
     const dailyRef = doc(db, "users", user.uid, "daily_stats", todayDate);
     let dailyRev = 0;
-
+    let dailyLines = 0;
+    let dailyData = 0;
+    let dailyDevices = 0;
+    let dailyAsurion = 0;
+    let dailyTv = 0;
+    let dailyPhone = 0;
     try {
       const dailySnap = await getDoc(dailyRef);
       if (dailySnap.exists()) {
-        dailyRev = dailySnap.data().revenue || 0;
+        const dData = dailySnap.data();
+        dailyRev = dData.revenue || 0;
+        dailyLines = dData.lines || 0;
+        dailyData = dData.data || 0;
+        dailyDevices = dData.devices || 0;
+        dailyAsurion = dData.asurion || 0;
+        dailyTv = dData.tv || 0;
+        dailyPhone = dData.phone || 0;
       }
     } catch (error) {
       console.error("Error fetching daily revenue:", error);
@@ -74,6 +92,12 @@ export default function PanelVentas() {
           revenue: data.totalRevenue || 0,
           phone: data.totalPhone || 0,
           dailyRevenue: dailyRev || 0,
+          dailyLines: dailyLines || 0,
+          dailyData: dailyData || 0,
+          dailyDevices: dailyDevices || 0,
+          dailyAsurion: dailyAsurion || 0,
+          dailyTv: dailyTv || 0,
+          dailyPhone: dailyPhone || 0,
         });
       } else {
         setStats({
@@ -84,7 +108,13 @@ export default function PanelVentas() {
           tv: 0,
           revenue: 0,
           phone: 0,
-          dailyRevenue: 0,
+          dailyRevenue: dailyRev || 0,
+          dailyLines: dailyLines || 0,
+          dailyData: dailyData || 0,
+          dailyDevices: dailyDevices || 0,
+          dailyAsurion: dailyAsurion || 0,
+          dailyTv: dailyTv || 0,
+          dailyPhone: dailyPhone || 0,
         });
       }
     } catch (error) {
@@ -211,7 +241,7 @@ export default function PanelVentas() {
                 className="text-indigo-100 font-medium hover:text-white transition-colors relative group"
               >
                 <div className="flex flex-col items-center gap-2">
-                  <RadarIcon />
+                  <Flag />
                   <p className="text-sm">Daily Ranking</p>
                 </div>
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all group-hover:w-full"></span>
@@ -239,21 +269,20 @@ export default function PanelVentas() {
 
 
 
-              <div className="relative">
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-2 rounded-full hover:bg-white/10 transition-colors"
-                  >
-                    <Bell size={20} className={showNotifications ? 'text-white' : 'text-indigo-100'} />
+              <div className="relative group cursor-pointer">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="flex flex-col items-center gap-2 text-indigo-100 relative"
+                >
+                  <div className="relative cursor-pointer ">
+                    <Bell />
                     {pendingChallenges.length > 0 && (
-                      <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-indigo-500 animate-pulse"></span>
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-indigo-500 animate-pulse"></span>
                     )}
-
-                  </button>
-                  <p className="text-sm text-indigo-100">Notifications</p>
-
-                </div>
+                  </div>
+                  <p className="text-sm font-medium">Notifications</p>
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 "></span>
+                </button>
                 {showNotifications && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
@@ -385,7 +414,16 @@ export default function PanelVentas() {
 
           {/* Right column: Table & Filters */}
           <main className="lg:col-span-3">
-            <p className="text-sm ml-5 font-bold text-white">Daily Revenue: ${stats.dailyRevenue}</p>
+            <p className="text-sm ml-5 font-bold text-white text-center">Today's Sales</p>
+            <span className="flex gap-5 justify-center">
+              <p className="text-sm ml-5 font-bold text-white text-center"> Revenue: ${stats.dailyRevenue}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Data: {stats.dailyData}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Lines: {stats.dailyLines}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Devices: {stats.dailyDevices}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Asurion: {stats.dailyAsurion}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Tv: {stats.dailyTv}</p>
+              <p className="text-sm ml-5 font-bold text-white text-center"> Phone: {stats.dailyPhone}</p>
+            </span>
             <Table onProductDeleted={fetchStats} onProductAdded={fetchStats} />
           </main>
           <RankingComponente />
