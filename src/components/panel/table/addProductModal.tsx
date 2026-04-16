@@ -230,10 +230,13 @@ export default function ModalAddProducts({
         products: productsList, // Array of details
         quantity: totalQuantity,
         revenue: totalRevenueVal,
-        status: "Completed",
+        status: "pending",
       };
 
       await addDoc(collection(db, "users", user.uid, "products"), productData);
+      
+      // Guardar en dataHistory para tener un registro histórico de todas las transacciones
+      await addDoc(collection(db, "users", user.uid, "dataHistory"), productData);
 
       // Add total revenue to stats if applicable
       if (totalRevenueVal > 0) {

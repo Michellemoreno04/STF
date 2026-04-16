@@ -160,6 +160,20 @@ export const DailyRanking = () => {
             });
             // Automatically join the created group
             await handleJoinGroup(groupRef.id);
+
+            // Create a community publication for the group creation
+            await addDoc(collection(db, "publications"), {
+                userId: user.uid,
+                userName: user.displayName || 'Anonymous',
+                userAvatar: user.photoURL || '',
+                product: `Nuevo Grupo: ${newGroupName.trim()}`,
+                revenue: 0,
+                type: 'Group',
+                groupId: groupRef.id,
+                groupName: newGroupName.trim(),
+                timestamp: serverTimestamp()
+            });
+
             setNewGroupName("");
             setShowAddGroupModal(false);
         } catch (error) {

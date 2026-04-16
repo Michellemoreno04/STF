@@ -107,12 +107,9 @@ export const RankingComponente = () => {
                         <Trophy className="text-white" size={20} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Top Performers</h2>
-                        <p className="text-xs text-slate-500 font-medium">Monthly Leaderboard</p>
+                        <h2 className="text-xl font-bold text-slate-800 tracking-tight">Social & Stats</h2>
+                        <p className="text-xs text-slate-500 font-medium">Community Activity</p>
                     </div>
-                </div>
-                <div className="px-3 py-1.5 bg-indigo-50 rounded-lg text-xs font-bold text-indigo-600 border border-indigo-100/50 shadow-sm">
-                    {new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })}
                 </div>
             </div>
 
@@ -203,4 +200,3 @@ export const RankingComponente = () => {
         </div>
     );
 };
-

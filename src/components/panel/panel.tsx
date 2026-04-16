@@ -218,7 +218,7 @@ export default function PanelVentas() {
 
       <div className="relative z-10 max-w-[95rem] mx-auto p-4 md:p-8">
         {/* Header */}
-        <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-10">
+        <header className="relative z-[100] flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-10">
           <div className="bg-white/40 backdrop-blur-md p-6 rounded-[2rem] border border-white/60 shadow-xl shadow-indigo-100/20">
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-2 bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
               STF Panel
@@ -226,7 +226,7 @@ export default function PanelVentas() {
             <p className="text-slate-500 flex flex-row items-center text-lg font-medium">
               Welcome back,
               <span className="text-slate-800 font-bold ml-1.5 flex items-center gap-1.5 px-3 py-1 bg-white/60 rounded-full shadow-sm text-sm border border-white/80">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 {userInfo.displayName}
               </span>
             </p>
@@ -236,7 +236,8 @@ export default function PanelVentas() {
           <div className="glass p-2.5 rounded-[2rem] flex items-center gap-2 self-start xl:self-auto shadow-2xl shadow-indigo-200/20">
             <nav className="flex items-center">
               {[
-                { to: "/alarm", icon: <BellRing size={20} />, label: "Alarm" },
+                { to: "/data-history", icon: <BellRing size={20} />, label: "Data History" },
+                { to: "/alarm", icon: <BellRing size={20} />, label: "Call backs" },
                 { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking" },
                 { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge" },
                 { to: "/previous-months", icon: <Calendar size={20} />, label: "History" },
@@ -275,7 +276,7 @@ export default function PanelVentas() {
                 {showNotifications && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                    <div className="absolute right-0 mt-4 w-96 bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-2xl py-4 z-50 border border-white/50 animate-in fade-in slide-in-from-top-4 duration-300 origin-top-right">
+                    <div className="absolute right-0 mt-4 w-96 bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-2xl py-4 z-[100] border border-white/50 animate-in fade-in slide-in-from-top-4 duration-300 origin-top-right">
                       <div className="px-6 py-3 border-b border-indigo-50/50 flex justify-between items-center">
                         <h3 className="font-bold text-slate-800 text-lg">Notifications</h3>
                         <span className="text-xs font-bold px-2 py-1 bg-indigo-100 text-indigo-600 rounded-lg">{pendingChallenges.length} new</span>
@@ -428,7 +429,7 @@ export default function PanelVentas() {
           </main>
 
           {/* Right column: Ranking */}
-          <div className="lg:col-span-3 h-full min-h-[500px]">
+          <div className="lg:col-span-3 h-full min-h-[500px] relative z-0">
             <RankingComponente />
           </div>
         </div>
