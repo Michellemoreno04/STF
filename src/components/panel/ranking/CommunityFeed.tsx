@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { MessageSquare } from "lucide-react";
-import { useAuth } from "../auth/authContext";
-import { doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
-import Swal from "sweetalert2";
+
 
 interface Publication {
     id: string;
@@ -21,13 +18,8 @@ interface Publication {
 }
 
 export const CommunityFeed = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
     const [publications, setPublications] = useState<Publication[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userGroupId, setUserGroupId] = useState<string | null>(null);
-    const [groups, setGroups] = useState<{ id: string, name: string }[]>([]);
-    const [joiningId, setJoiningId] = useState<string | null>(null);
 
     useEffect(() => {
         const q = query(
@@ -50,124 +42,6 @@ export const CommunityFeed = () => {
 
         return () => unsubscribe();
     }, []);
-
-    // Fetch user group status
-    useEffect(() => {
-        if (!user) return;
-        const userRef = doc(db, "users", user.uid);
-        const unsubscribe = onSnapshot(userRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setUserGroupId(docSnap.data().dailyRankingGroupId || null);
-            }
-        });
-        return () => unsubscribe();
-    }, [user]);
-
-    // Fetch all groups
-    useEffect(() => {
-        const q = query(collection(db, "rankingGroups"), orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const groupsData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                name: doc.data().name
-            }));
-            setGroups(groupsData);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    const handleJoinGroup = async (groupId: string) => {
-        if (!user) return;
-        setJoiningId(groupId);
-        try {
-            const userRef = doc(db, "users", user.uid);
-            await updateDoc(userRef, {
-                dailyRankingGroupId: groupId
-            });
-            Swal.fire({
-                icon: 'success',
-                title: '¡Te has unido!',
-                text: 'Ahora eres parte de este grupo.',
-                timer: 2000,
-                showConfirmButton: false,
-                position: 'top-end',
-                toast: true
-            });
-        } catch (error) {
-            console.error("Error joining group:", error);
-        } finally {
-            setJoiningId(null);
-        }
-    };
-
-    const handleUploadLote = async () => {
-        if (!user) return;
-
-        const { value: formValues } = await Swal.fire({
-            title: 'Subir Lote de Venta',
-            html:
-                '<input id="swal-product" class="swal2-input" placeholder="Producto">' +
-                '<input id="swal-revenue" type="number" class="swal2-input" placeholder="Revenue ($)">' +
-                '<select id="swal-type" class="swal2-input">' +
-                '<option value="Devices">Devices</option>' +
-                '<option value="Data">Data</option>' +
-                '<option value="Line">Line</option>' +
-                '<option value="Other">Other</option>' +
-                '</select>',
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'Publicar',
-            confirmButtonColor: '#4f46e5',
-            preConfirm: () => {
-                return {
-                    product: (document.getElementById('swal-product') as HTMLInputElement).value,
-                    revenue: (document.getElementById('swal-revenue') as HTMLInputElement).value,
-                    type: (document.getElementById('swal-type') as HTMLSelectElement).value
-                }
-            }
-        });
-
-        if (formValues && formValues.product && formValues.revenue) {
-            try {
-                const groupName = groups.find(g => g.id === userGroupId)?.name || 'Global';
-                await addDoc(collection(db, "publications"), {
-                    userId: user.uid,
-                    userName: user.displayName || 'Anonymous',
-                    userAvatar: user.photoURL || '',
-                    product: formValues.product,
-                    revenue: parseFloat(formValues.revenue),
-                    type: formValues.type,
-                    groupId: userGroupId || 'global',
-                    groupName: groupName,
-                    timestamp: serverTimestamp()
-                });
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Lote publicado',
-                    timer: 1500,
-                    showConfirmButton: false,
-                    position: 'top-end',
-                    toast: true
-                });
-            } catch (error) {
-                console.error("Error publishing lote:", error);
-            }
-        }
-    };
-
-    const formatTime = (timestamp: any) => {
-        if (!timestamp) return "Just now";
-        try {
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-            return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-                Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60)),
-                'minute'
-            );
-        } catch {
-            return "Recently";
-        }
-    };
 
     if (loading) {
         return (

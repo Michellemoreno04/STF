@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { X, BellRing, BellOff, Type, ArrowLeft, Plus, Save, Trash2, Volume2 } from 'lucide-react';
+import { X, BellRing, BellOff, Type, ArrowLeft, Plus, Save, Trash2, Volume2, CalendarDays } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useAlarm } from './AlarmContext';
 
 interface AlarmData {
     id: string;
+    date: string;
     time: string;
     title: string;
     description: string;
@@ -19,6 +20,7 @@ export function AlarmClock() {
     // Form State
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [inputDate, setInputDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [inputTime, setInputTime] = useState('');
     const [inputTitle, setInputTitle] = useState('');
     const [inputDescription, setInputDescription] = useState('');
@@ -26,15 +28,17 @@ export function AlarmClock() {
     // CRUD Operations
     const handleAddNew = () => {
         setEditingId(null);
+        setInputDate(new Date().toISOString().split('T')[0]);
         setInputTime('');
         setInputTitle('');
         setInputDescription('');
         setIsEditing(true);
-        primeAudio(); // Initialize audio context on user interaction
+        primeAudio();
     };
 
     const handleEdit = (alarm: AlarmData) => {
         setEditingId(alarm.id);
+        setInputDate(alarm.date || new Date().toISOString().split('T')[0]);
         setInputTime(alarm.time);
         setInputTitle(alarm.title);
         setInputDescription(alarm.description);
@@ -71,9 +75,9 @@ export function AlarmClock() {
         e.preventDefault();
 
         if (editingId) {
-            updateAlarm(editingId, inputTime, inputTitle, inputDescription);
+            updateAlarm(editingId, inputDate, inputTime, inputTitle, inputDescription);
         } else {
-            addAlarm(inputTime, inputTitle, inputDescription);
+            addAlarm(inputDate, inputTime, inputTitle, inputDescription);
         }
 
         setIsEditing(false);
@@ -90,23 +94,21 @@ export function AlarmClock() {
     };
 
     // Helper to calculate time until next alarm instance
-    const getTimeUntil = (timeStr: string) => {
+    const getTimeUntil = (dateStr: string, timeStr: string) => {
         const now = new Date();
         const [hours, minutes] = timeStr.split(':').map(Number);
+        const [year, month, day] = dateStr.split('-').map(Number);
 
-        const target = new Date(now);
-        target.setHours(hours);
-        target.setMinutes(minutes);
-        target.setSeconds(0);
-
-        if (target <= now) {
-            target.setDate(target.getDate() + 1);
-        }
+        const target = new Date(year, month - 1, day, hours, minutes, 0);
 
         const diff = target.getTime() - now.getTime();
-        const diffHours = Math.floor(diff / (1000 * 60 * 60));
+        if (diff <= 0) return 'Pasada';
+
+        const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const diffHours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const diffMinutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
+        if (diffDays > 0) return `${diffDays}d ${diffHours}h`;
         if (diffHours === 0 && diffMinutes === 0) return 'Menos de 1m';
         if (diffHours === 0) return `${diffMinutes}m`;
         return `${diffHours}h ${diffMinutes}m`;
@@ -168,6 +170,22 @@ export function AlarmClock() {
 
                             <form onSubmit={handleSave} className="space-y-6 flex-1 overflow-y-auto pr-2">
                                 <div className="space-y-4">
+                                    {/* Date picker */}
+                                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                                        <label className="block text-xs font-semibold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <CalendarDays size={14} />
+                                            Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            required
+                                            value={inputDate}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            onChange={(e) => setInputDate(e.target.value)}
+                                            className="bg-transparent border-none text-2xl font-mono font-bold text-white text-center w-full focus:outline-none focus:ring-0 p-0 [color-scheme:dark] cursor-pointer"
+                                        />
+                                    </div>
+                                    {/* Time picker */}
                                     <div className="bg-black/20 p-6 rounded-2xl border border-white/5 text-center">
                                         <label className="block text-xs font-semibold text-indigo-300 uppercase tracking-widest mb-4">Alarm time</label>
                                         <input
@@ -265,15 +283,21 @@ export function AlarmClock() {
                                                             <span className={`text-3xl font-mono font-bold ${alarm.isActive ? 'text-white' : 'text-slate-400'}`}>
                                                                 {formatTime12Hour(alarm.time)}
                                                             </span>
-                                                            {alarm.isActive && (
+                                                            {alarm.isActive && getTimeUntil(alarm.date, alarm.time) !== 'Pasada' && (
                                                                 <span className="text-xs font-medium text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
-                                                                    en {getTimeUntil(alarm.time)}
+                                                                    en {getTimeUntil(alarm.date, alarm.time)}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <p className="text-sm text-indigo-200 mt-1 font-medium truncate pr-4">
                                                             {alarm.title}
                                                         </p>
+                                                        {alarm.date && (
+                                                            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                                                                <CalendarDays size={12} />
+                                                                {new Date(alarm.date + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </p>
+                                                        )}
                                                     </div>
 
                                                     <div className="flex items-center gap-2 ">

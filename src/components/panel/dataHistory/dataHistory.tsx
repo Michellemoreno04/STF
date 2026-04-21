@@ -53,6 +53,7 @@ interface RankingGroup {
     name: string;
     createdBy: string;
     createdAt: any;
+    lastPostAt?: any;
 }
 
 const statusConfig = {
@@ -100,6 +101,7 @@ export const DataHistory = () => {
     const [isPublishing, setIsPublishing] = useState(false);
     const [isCreatingNewGroup, setIsCreatingNewGroup] = useState(false);
     const [userGroupId, setUserGroupId] = useState<string | null>(null);
+    const [lastSeenGroups, setLastSeenGroups] = useState<Record<string, any>>({});
 
     useEffect(() => {
         if (!user) return;
@@ -123,6 +125,7 @@ export const DataHistory = () => {
         const userUnsubscribe = onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
                 setUserGroupId(docSnap.data().dailyRankingGroupId || null);
+                setLastSeenGroups(docSnap.data().lastSeenGroups || {});
             }
         });
 
@@ -142,7 +145,8 @@ export const DataHistory = () => {
                     id: groupDoc.id,
                     name: data.name || "Grupo sin nombre",
                     createdBy: data.createdBy || "",
-                    createdAt: data.createdAt || null
+                    createdAt: data.createdAt || null,
+                    lastPostAt: data.lastPostAt || null
                 };
             });
             setGroups(groupsData);
@@ -166,7 +170,7 @@ export const DataHistory = () => {
 
     const handleDelete = async (itemId: string) => {
         if (!user) return;
-        
+
         const result = await Swal.fire({
             title: '¿Borrar registro?',
             text: "Esta acción no se puede deshacer.",
@@ -243,7 +247,7 @@ export const DataHistory = () => {
                 createdBy: user.uid,
                 createdAt: serverTimestamp()
             });
-            
+
             // Auto-join the created group
             const userRef = doc(db, "users", user.uid);
             await updateDoc(userRef, {
@@ -279,8 +283,25 @@ export const DataHistory = () => {
 
     const handlePublish = async (item: ProductHistoryItem, groupId: string = "global", groupName?: string) => {
         if (!user) return;
+
+        // Validar que tenga nombre de cliente y número de cuenta para compartir en grupos
+        if (!item.clientName || !item.accountNumber) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Información Incompleta',
+                text: 'Para compartir esta orden, debes agregar el nombre del cliente y el número de cuenta primero en el icono de pencil.',
+                confirmButtonColor: '#4f46e5',
+                confirmButtonText: 'Entendido',
+                customClass: {
+                    popup: 'rounded-3xl',
+                    confirmButton: 'rounded-xl px-6 py-2'
+                }
+            });
+            return;
+        }
+
         setIsPublishing(true);
-        
+
         try {
             const finalGroupId = groupId;
             const finalGroupName = groupName || "Global";
@@ -298,6 +319,20 @@ export const DataHistory = () => {
                 groupId: finalGroupId,
                 groupName: finalGroupName,
                 timestamp: serverTimestamp()
+            });
+
+            // Update lastPostAt on the group doc to trigger notification dots
+            if (finalGroupId !== "global") {
+                const groupRef = doc(db, "publications", finalGroupId);
+                await updateDoc(groupRef, {
+                    lastPostAt: serverTimestamp()
+                });
+            }
+
+            // Mark this group as seen for the publisher (they don't need a dot for their own post)
+            const userRef = doc(db, "users", user.uid);
+            await updateDoc(userRef, {
+                [`lastSeenGroups.${finalGroupId}`]: serverTimestamp()
             });
 
             Swal.fire({
@@ -434,36 +469,63 @@ export const DataHistory = () => {
                                     <span className="text-xs font-bold whitespace-nowrap">Crear Grupo</span>
                                 </button>
                             </div>
-                            
+
                             {/* Grupos como lista de chats */}
                             <div className="mb-6">
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Grupos Disponibles</h3>
                                 <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {groups.map((group) => (
-                                        <button
-                                            key={group.id}
-                                            onClick={() => navigate(`/group/${group.id}`)}
-                                            className="w-full text-left p-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10 transition-all duration-300 flex items-center justify-between group"
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="relative">
-                                                    <div className="w-12 h-12 rounded-[1.2rem] bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center border border-indigo-100/50 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                                                        <Users size={22} className="text-indigo-600" />
+                                    {groups.map((group) => {
+                                        // Check if group has unseen posts
+                                        const lastPost = group.lastPostAt?.toMillis?.() || 0;
+                                        const lastSeen = lastSeenGroups[group.id]?.toMillis?.() || lastSeenGroups[group.id] || 0;
+                                        const hasUnseenPosts = lastPost > lastSeen;
+
+                                        return (
+                                            <button
+                                                key={group.id}
+                                                onClick={() => navigate(`/group/${group.id}`)}
+                                                className={`relative w-full text-left p-4 bg-white/80 backdrop-blur-sm rounded-2xl border transition-all duration-300 flex items-center justify-between group  ${hasUnseenPosts
+                                                    ? "border-red-200 hover:border-red-300 hover:shadow-lg hover:shadow-red-500/10"
+                                                    : "border-slate-100 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10"
+                                                    }`}
+                                            >
+                                                {/* Red notification dot on the main container */}
+                                                {hasUnseenPosts && (
+                                                    <div className="absolute top-0 -right-1.5 z-10 flex items-center justify-center">
+                                                        <div className="absolute w-4 h-4 bg-red-400 rounded-full animate-ping opacity-75" />
+                                                        <div className="relative w-4 h-4 bg-red-500 border-2 border-white rounded-full shadow-lg shadow-red-500/40" />
                                                     </div>
-                                                    {userGroupId === group.id && (
-                                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
-                                                    )}
+                                                )}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="relative">
+                                                        <div className="w-12 h-12 rounded-[1.2rem] bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center border border-indigo-100/50 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                                            <Users size={22} className="text-indigo-600" />
+                                                        </div>
+                                                        {userGroupId === group.id && (
+                                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-bold text-slate-800 text-base mb-0.5">{group.name}</h4>
+                                                            {hasUnseenPosts && (
+                                                                <span className="px-1.5 py-0.5 bg-red-50 text-red-500 text-[9px] font-black uppercase rounded-md border border-red-100 animate-pulse">
+                                                                    Nuevo
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500 font-medium">Click para entrar al chat grupal</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h4 className="font-bold text-slate-800 text-base mb-0.5">{group.name}</h4>
-                                                    <p className="text-[11px] text-slate-500 font-medium">Click para entrar al chat grupal</p>
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 shadow-sm ${hasUnseenPosts
+                                                    ? "bg-red-50 text-red-500 group-hover:bg-red-500 group-hover:text-white"
+                                                    : "bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white"
+                                                    }`}>
+                                                    <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                                                 </div>
-                                            </div>
-                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm">
-                                                <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-                                            </div>
-                                        </button>
-                                    ))}
+                                            </button>
+                                        );
+                                    })}
                                     {groups.length === 0 && (
                                         <div className="text-center py-8">
                                             <p className="text-slate-400 text-sm font-medium">Aún no hay grupos creados</p>
@@ -471,7 +533,7 @@ export const DataHistory = () => {
                                     )}
                                 </div>
                             </div>
-                            
+
                             <div className="bg-white/50 backdrop-blur-sm rounded-[2rem] border border-slate-100 p-2 shadow-sm">
                                 <CommunityFeed />
                             </div>
@@ -480,153 +542,152 @@ export const DataHistory = () => {
 
                     {/* List Section */}
                     <div className="lg:col-span-7 space-y-4 order-1 lg:order-2">
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200 animate-pulse">
-                            <div className="w-12 h-12 bg-indigo-100 rounded-full mb-4"></div>
-                            <div className="h-4 w-32 bg-slate-100 rounded-full"></div>
-                        </div>
-                    ) : filteredHistory.length === 0 ? (
-                        <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <Search size={32} className="text-slate-300" />
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200 animate-pulse">
+                                <div className="w-12 h-12 bg-indigo-100 rounded-full mb-4"></div>
+                                <div className="h-4 w-32 bg-slate-100 rounded-full"></div>
                             </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">No records found</h3>
-                            <p className="text-slate-500">Try adjusting your search or filters.</p>
-                        </div>
-                    ) : (
-                        filteredHistory.map((item) => (
-                            <div
-                                key={item.id}
-                                className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 transition-all duration-300 flex flex-col md:flex-row md:items-center gap-6"
-                            >
-                                <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner shrink-0 bg-slate-50 group-hover:scale-110 transition-transform duration-300`}>
-                                    {getIcon(item.type)}
+                        ) : filteredHistory.length === 0 ? (
+                            <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+                                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Search size={32} className="text-slate-300" />
                                 </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">No records found</h3>
+                                <p className="text-slate-500">Try adjusting your search or filters.</p>
+                            </div>
+                        ) : (
+                            filteredHistory.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 transition-all duration-300 flex flex-col md:flex-row md:items-center gap-6"
+                                >
+                                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner shrink-0 bg-slate-50 group-hover:scale-110 transition-transform duration-300`}>
+                                        {getIcon(item.type)}
+                                    </div>
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider rounded-lg">
-                                            {item.type}
-                                        </span>
-                                        
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => setShowStatusMenu(showStatusMenu === item.id ? null : item.id)}
-                                                className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all flex items-center gap-1 ${
-                                                    statusConfig[item.status as keyof typeof statusConfig]?.color || statusConfig.pending.color
-                                                } ${updatingId === item.id ? 'opacity-50 animate-pulse' : 'hover:scale-105 active:scale-95'}`}
-                                            >
-                                                {statusConfig[item.status as keyof typeof statusConfig]?.icon || statusConfig.pending.icon}
-                                                {statusConfig[item.status as keyof typeof statusConfig]?.label || 'Pending'}
-                                                <ChevronDown size={10} className={`transition-transform ${showStatusMenu === item.id ? 'rotate-180' : ''}`} />
-                                            </button>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                                                {item.type}
+                                            </span>
 
-                                            {showStatusMenu === item.id && (
-                                                <>
-                                                    <div 
-                                                        className="fixed inset-0 z-10" 
-                                                        onClick={() => setShowStatusMenu(null)}
-                                                    />
-                                                    <div className="absolute top-full left-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
-                                                        {Object.entries(statusConfig).map(([key, config]) => (
-                                                            <button
-                                                                key={key}
-                                                                onClick={() => handleUpdateStatus(item.id, key)}
-                                                                className="w-full px-4 py-2 text-left hover:bg-slate-50 flex items-center transition-colors"
-                                                            >
-                                                                <span className={`w-2 h-2 rounded-full mr-3 ${config.color.split(' ')[0]}`} />
-                                                                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                    {config.label}
-                                                                </span>
-                                                            </button>
-                                                        ))}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowStatusMenu(showStatusMenu === item.id ? null : item.id)}
+                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all flex items-center gap-1 ${statusConfig[item.status as keyof typeof statusConfig]?.color || statusConfig.pending.color
+                                                        } ${updatingId === item.id ? 'opacity-50 animate-pulse' : 'hover:scale-105 active:scale-95'}`}
+                                                >
+                                                    {statusConfig[item.status as keyof typeof statusConfig]?.icon || statusConfig.pending.icon}
+                                                    {statusConfig[item.status as keyof typeof statusConfig]?.label || 'Pending'}
+                                                    <ChevronDown size={10} className={`transition-transform ${showStatusMenu === item.id ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {showStatusMenu === item.id && (
+                                                    <>
+                                                        <div
+                                                            className="fixed inset-0 z-10"
+                                                            onClick={() => setShowStatusMenu(null)}
+                                                        />
+                                                        <div className="absolute top-full left-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
+                                                            {Object.entries(statusConfig).map(([key, config]) => (
+                                                                <button
+                                                                    key={key}
+                                                                    onClick={() => handleUpdateStatus(item.id, key)}
+                                                                    className="w-full px-4 py-2 text-left hover:bg-slate-50 flex items-center transition-colors"
+                                                                >
+                                                                    <span className={`w-2 h-2 rounded-full mr-3 ${config.color.split(' ')[0]}`} />
+                                                                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                        {config.label}
+                                                                    </span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-800 truncate mb-1">
+                                            {item.product}
+                                        </h3>
+
+                                        {(item.clientName || item.accountNumber) && (
+                                            <div className="flex flex-wrap gap-3 mb-3">
+                                                {item.clientName && (
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100/50">
+                                                        <User size={12} />
+                                                        <span className="text-[11px] font-bold">{item.clientName}</span>
                                                     </div>
-                                                </>
-                                            )}
+                                                )}
+                                                {item.accountNumber && (
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg border border-slate-100">
+                                                        <Hash size={12} />
+                                                        <span className="text-[11px] font-bold">{item.accountNumber}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-500">
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar size={14} />
+                                                {formatDate(item.date)}
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock size={14} />
+                                                {item.hour || 'N/A'}
+                                            </div>
                                         </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-slate-800 truncate mb-1">
-                                        {item.product}
-                                    </h3>
-                                    
-                                    {(item.clientName || item.accountNumber) && (
-                                        <div className="flex flex-wrap gap-3 mb-3">
-                                            {item.clientName && (
-                                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100/50">
-                                                    <User size={12} />
-                                                    <span className="text-[11px] font-bold">{item.clientName}</span>
-                                                </div>
-                                            )}
-                                            {item.accountNumber && (
-                                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg border border-slate-100">
-                                                    <Hash size={12} />
-                                                    <span className="text-[11px] font-bold">{item.accountNumber}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
 
-                                    <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-500">
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar size={14} />
-                                            {formatDate(item.date)}
+                                    <div className="flex items-center justify-between md:flex-col md:items-end gap-4 md:gap-1 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
+                                        <div className="flex items-center gap-2 md:mb-2">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedItemToShare(item);
+                                                    setSelectedGroupId(userGroupId || "global");
+                                                    setShowShareModal(true);
+                                                }}
+                                                className="p-2.5 bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 shadow-sm"
+                                                title="Publicar en comunidad"
+                                            >
+                                                <Share2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditClick(item)}
+                                                className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100 shadow-sm"
+                                                title="Edit Info"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(item.id)}
+                                                className="p-2.5 bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 shadow-sm"
+                                                title="Delete Record"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <Clock size={14} />
-                                            {item.hour || 'N/A'}
+
+                                        <div className="flex flex-col items-end">
+                                            <div className="text-sm font-bold text-slate-400 md:hidden uppercase tracking-widest">Revenue</div>
+                                            <div className="text-3xl font-black text-indigo-600 leading-none">
+                                                ${(item.revenue || 0).toFixed(2)}
+                                            </div>
+                                            <div className="hidden md:flex items-center gap-1.5 text-slate-400 mt-1">
+                                                <span className="text-xs font-bold uppercase">Qty:</span>
+                                                <span className="text-sm font-bold text-slate-600">{item.quantity}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="absolute top-1/2 -translate-y-1/2 right-4 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                            <ChevronRight size={20} />
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center justify-between md:flex-col md:items-end gap-4 md:gap-1 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
-                                    <div className="flex items-center gap-2 md:mb-2">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedItemToShare(item);
-                                                setSelectedGroupId(userGroupId || "global");
-                                                setShowShareModal(true);
-                                            }}
-                                            className="p-2.5 bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 shadow-sm"
-                                            title="Publicar en comunidad"
-                                        >
-                                            <Share2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleEditClick(item)}
-                                            className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100 shadow-sm"
-                                            title="Edit Info"
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(item.id)}
-                                            className="p-2.5 bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-100 shadow-sm"
-                                            title="Delete Record"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex flex-col items-end">
-                                        <div className="text-sm font-bold text-slate-400 md:hidden uppercase tracking-widest">Revenue</div>
-                                        <div className="text-3xl font-black text-indigo-600 leading-none">
-                                            ${(item.revenue || 0).toFixed(2)}
-                                        </div>
-                                        <div className="hidden md:flex items-center gap-1.5 text-slate-400 mt-1">
-                                            <span className="text-xs font-bold uppercase">Qty:</span>
-                                            <span className="text-sm font-bold text-slate-600">{item.quantity}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="absolute top-1/2 -translate-y-1/2 right-4 hidden lg:block opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                        <ChevronRight size={20} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
@@ -642,7 +703,7 @@ export const DataHistory = () => {
                                 </div>
                                 Edit Details
                             </h2>
-                            <button 
+                            <button
                                 onClick={() => setEditingItem(null)}
                                 className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                             >
@@ -715,7 +776,7 @@ export const DataHistory = () => {
                                 </div>
                                 Compartir Venta
                             </h2>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowShareModal(false);
                                 }}
@@ -740,18 +801,17 @@ export const DataHistory = () => {
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">
                                     ¿En qué grupo quieres compartirlo?
                                 </label>
-                                
+
                                 <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar p-1">
                                     {/* Global Option */}
                                     <button
                                         onClick={() => {
                                             setSelectedGroupId("global");
                                         }}
-                                        className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
-                                            selectedGroupId === "global"
-                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm" 
-                                                : "border-slate-100 hover:border-indigo-200 text-slate-600 bg-white"
-                                        }`}
+                                        className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${selectedGroupId === "global"
+                                            ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                                            : "border-slate-100 hover:border-indigo-200 text-slate-600 bg-white"
+                                            }`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-lg ${selectedGroupId === "global" ? "bg-indigo-100" : "bg-slate-50"}`}>
@@ -773,32 +833,31 @@ export const DataHistory = () => {
                                     {userGroupId && groups.find(g => g.id === userGroupId) && (
                                         <button
                                             onClick={() => {
-                                            setSelectedGroupId(userGroupId);
-                                        }}
-                                        className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
-                                            selectedGroupId === userGroupId
-                                                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm" 
+                                                setSelectedGroupId(userGroupId);
+                                            }}
+                                            className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${selectedGroupId === userGroupId
+                                                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
                                                 : "border-slate-100 hover:border-emerald-200 text-slate-600 bg-white"
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${selectedGroupId === userGroupId ? "bg-emerald-100" : "bg-slate-50"}`}>
-                                                <Users size={18} className={selectedGroupId === userGroupId ? "text-emerald-600" : "text-slate-400"} />
-                                            </div>
-                                            <div className="text-left">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold block">{groups.find(g => g.id === userGroupId)?.name}</span>
-                                                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-600 text-[8px] font-black uppercase rounded">Mi Grupo</span>
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${selectedGroupId === userGroupId ? "bg-emerald-100" : "bg-slate-50"}`}>
+                                                    <Users size={18} className={selectedGroupId === userGroupId ? "text-emerald-600" : "text-slate-400"} />
                                                 </div>
-                                                <span className="text-[10px] text-slate-400 font-medium">Solo tu grupo podrá ver esta venta</span>
+                                                <div className="text-left">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold block">{groups.find(g => g.id === userGroupId)?.name}</span>
+                                                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-600 text-[8px] font-black uppercase rounded">Mi Grupo</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-400 font-medium">Solo tu grupo podrá ver esta venta</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        {selectedGroupId === userGroupId && (
-                                            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                                                <CheckCircle2 size={12} className="text-white" />
-                                            </div>
-                                        )}
-                                    </button>
+                                            {selectedGroupId === userGroupId && (
+                                                <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                                                    <CheckCircle2 size={12} className="text-white" />
+                                                </div>
+                                            )}
+                                        </button>
                                     )}
 
                                     {/* Other Groups */}
@@ -810,26 +869,25 @@ export const DataHistory = () => {
                                         <button
                                             key={group.id}
                                             onClick={() => {
-                                            setSelectedGroupId(group.id);
-                                        }}
-                                        className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${
-                                            selectedGroupId === group.id
-                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700" 
+                                                setSelectedGroupId(group.id);
+                                            }}
+                                            className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all ${selectedGroupId === group.id
+                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
                                                 : "border-slate-100 hover:border-indigo-200 text-slate-600 bg-white"
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${selectedGroupId === group.id ? "bg-indigo-100" : "bg-slate-50"}`}>
-                                                <Users size={18} className={selectedGroupId === group.id ? "text-indigo-600" : "text-slate-400"} />
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${selectedGroupId === group.id ? "bg-indigo-100" : "bg-slate-50"}`}>
+                                                    <Users size={18} className={selectedGroupId === group.id ? "text-indigo-600" : "text-slate-400"} />
+                                                </div>
+                                                <span className="font-bold">{group.name}</span>
                                             </div>
-                                            <span className="font-bold">{group.name}</span>
-                                        </div>
-                                        {selectedGroupId === group.id && (
-                                            <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
-                                                <CheckCircle2 size={12} className="text-white" />
-                                            </div>
-                                        )}
-                                    </button>
+                                            {selectedGroupId === group.id && (
+                                                <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
+                                                    <CheckCircle2 size={12} className="text-white" />
+                                                </div>
+                                            )}
+                                        </button>
                                     ))}
                                 </div>
                             </div>
@@ -839,7 +897,7 @@ export const DataHistory = () => {
                             onClick={() => {
                                 const group = groups.find(g => g.id === selectedGroupId);
                                 handlePublish(
-                                    selectedItemToShare, 
+                                    selectedItemToShare,
                                     selectedGroupId,
                                     group?.name || "Global"
                                 );
@@ -870,7 +928,7 @@ export const DataHistory = () => {
                                 </div>
                                 Crear Nuevo Grupo
                             </h2>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowCreateGroupModal(false);
                                     setNewGroupName("");

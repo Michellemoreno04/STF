@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp, getDocs, writeBatch, deleteDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
-import { 
-    ArrowLeft, 
-    Clock, 
-    TrendingUp, 
-    Package, 
-    MessageSquare, 
-    Plus, 
+import {
+    ArrowLeft,
+    Clock,
+    TrendingUp,
+    Package,
+    MessageSquare,
+    Plus,
     Check,
     Globe,
     Target,
@@ -19,7 +19,10 @@ import {
     Clock4,
     User,
     Hash,
-    Trash2
+    Trash2,
+    Phone,
+    PhoneOff,
+    ChevronDown
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -36,6 +39,8 @@ interface Publication {
     type: string;
     groupId?: string;
     groupName?: string;
+    callingByUserId?: string;
+    callingByUserName?: string;
     timestamp: any;
 }
 
@@ -66,7 +71,7 @@ export const GroupPage = () => {
     const { groupId } = useParams<{ groupId: string }>();
     const { user } = useAuth();
     const navigate = useNavigate();
-    
+
     const [groupName, setGroupName] = useState<string>("Loading Group...");
     const [publications, setPublications] = useState<Publication[]>([]);
     const [loading, setLoading] = useState(true);
@@ -75,9 +80,11 @@ export const GroupPage = () => {
     const [groupCreatedBy, setGroupCreatedBy] = useState<string>("");
     const [deletingGroup, setDeletingGroup] = useState(false);
     const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+    const [showStatusMenu, setShowStatusMenu] = useState<string | null>(null);
+    const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
     const isGroupCreator = !!user && user.uid === groupCreatedBy;
 
-    // Fetch group details
+    // Fetch group details & mark as seen
     useEffect(() => {
         if (!groupId) return;
         const fetchGroup = async () => {
@@ -91,12 +98,20 @@ export const GroupPage = () => {
             }
         };
         fetchGroup();
-    }, [groupId]);
+
+        // Mark this group as seen to clear the notification dot
+        if (user) {
+            const userRef = doc(db, "users", user.uid);
+            updateDoc(userRef, {
+                [`lastSeenGroups.${groupId}`]: serverTimestamp()
+            }).catch((err) => console.error("Error marking group as seen:", err));
+        }
+    }, [groupId, user]);
 
     // Fetch publications for this group
     useEffect(() => {
         if (!groupId) return;
-        
+
         const q = query(
             collection(db, "publications", groupId, "posts"),
             orderBy("timestamp", "desc")
@@ -155,7 +170,7 @@ export const GroupPage = () => {
 
     const handleUploadSale = async () => {
         if (!user || !groupId) return;
-        
+
         const { value: formValues } = await Swal.fire({
             title: `Publicar en ${groupName}`,
             html:
@@ -163,10 +178,10 @@ export const GroupPage = () => {
                 '<input id="swal-product" class="swal2-input !m-0" placeholder="¿Qué vendiste?">' +
                 '<input id="swal-revenue" type="number" class="swal2-input !m-0" placeholder="Revenue ($)">' +
                 '<select id="swal-type" class="swal2-input !m-0">' +
-                    '<option value="Devices">Devices</option>' +
-                    '<option value="Data">Data</option>' +
-                    '<option value="Line">Line</option>' +
-                    '<option value="Other">Other</option>' +
+                '<option value="Devices">Devices</option>' +
+                '<option value="Data">Data</option>' +
+                '<option value="Line">Line</option>' +
+                '<option value="Other">Other</option>' +
                 '</select>' +
                 '</div>',
             focusConfirm: false,
@@ -197,6 +212,18 @@ export const GroupPage = () => {
                     groupId: groupId,
                     groupName: groupName,
                     timestamp: serverTimestamp()
+                });
+
+                // Update lastPostAt to trigger notification dots for other users
+                const groupRef = doc(db, "publications", groupId);
+                await updateDoc(groupRef, {
+                    lastPostAt: serverTimestamp()
+                });
+
+                // Mark as seen for the publisher
+                const userRef = doc(db, "users", user.uid);
+                await updateDoc(userRef, {
+                    [`lastSeenGroups.${groupId}`]: serverTimestamp()
                 });
 
                 Swal.fire({
@@ -276,7 +303,7 @@ export const GroupPage = () => {
     };
 
     const handleDeletePost = async (postId: string) => {
-        if (!user || !groupId || !isGroupCreator || deletingPostId) return;
+        if (!user || !groupId || deletingPostId) return;
 
         const result = await Swal.fire({
             title: "¿Eliminar publicación?",
@@ -320,6 +347,55 @@ export const GroupPage = () => {
             });
         } finally {
             setDeletingPostId(null);
+        }
+    };
+
+    const handleToggleCall = async (postId: string, currentCallUserId?: string) => {
+        if (!user || !groupId) return;
+
+        if (currentCallUserId && currentCallUserId !== user.uid) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No disponible',
+                text: 'Otro usuario ya está dandole seguimiento a esta orden.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+            return;
+        }
+
+        try {
+            const postRef = doc(db, "publications", groupId, "posts", postId);
+
+            if (currentCallUserId === user.uid) {
+                await updateDoc(postRef, {
+                    callingByUserId: null,
+                    callingByUserName: null
+                });
+            } else {
+                await updateDoc(postRef, {
+                    callingByUserId: user.uid,
+                    callingByUserName: user.displayName || 'Anonymous'
+                });
+            }
+        } catch (error) {
+            console.error("Error toggling call status:", error);
+        }
+    };
+
+    const handleUpdatePostStatus = async (postId: string, newStatus: string) => {
+        if (!user || !groupId) return;
+        setUpdatingStatusId(postId);
+        try {
+            const postRef = doc(db, "publications", groupId, "posts", postId);
+            await updateDoc(postRef, { status: newStatus });
+            setShowStatusMenu(null);
+        } catch (error) {
+            console.error("Error updating status:", error);
+        } finally {
+            setUpdatingStatusId(null);
         }
     };
 
@@ -408,7 +484,7 @@ export const GroupPage = () => {
                                 </div>
                                 <h3 className="text-xl font-bold text-slate-800 mb-2">Sin publicaciones</h3>
                                 <p className="text-slate-500 max-w-xs mx-auto">Sé el primero en compartir algo con el grupo {groupName}.</p>
-                                <button 
+                                <button
                                     onClick={handleUploadSale}
                                     className="mt-6 px-6 py-3 bg-indigo-50 text-indigo-600 font-bold rounded-2xl hover:bg-indigo-100 transition-colors"
                                 >
@@ -423,72 +499,131 @@ export const GroupPage = () => {
                                     const currentStatus = statusConfig[normalizedStatus as keyof typeof statusConfig] || statusConfig.pending;
 
                                     return (
-                                <div 
-                                    key={item.id}
-                                    className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300"
-                                >
-                                    <div className="flex items-center gap-4 mb-5">
-                                        <img 
-                                            src={item.userAvatar || `https://ui-avatars.com/api/?name=${item.userName}&background=random`} 
-                                            alt={item.userName} 
-                                            className="w-12 h-12 rounded-2xl border-2 border-white shadow-md"
-                                        />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-slate-800 text-lg leading-tight">{item.userName}</p>
-                                            <div className="flex items-center gap-3 mt-1">
-                                                <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium tracking-tight">
-                                                    <Clock size={12} />
-                                                    <span>Recientemente</span>
+                                        <div
+                                            key={item.id}
+                                            className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300"
+                                        >
+                                            <div className="flex items-center gap-4 mb-5">
+                                                <img
+                                                    src={item.userAvatar || `https://ui-avatars.com/api/?name=${item.userName}&background=random`}
+                                                    alt={item.userName}
+                                                    className="w-12 h-12 rounded-2xl border-2 border-white shadow-md"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-slate-800 text-lg leading-tight">{item.userName}</p>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium tracking-tight">
+                                                            <Clock size={12} />
+                                                            <span>Recientemente</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2 shadow-sm">
+                                                    <TrendingUp size={16} strokeWidth={3} />
+                                                    <span className="font-black text-sm">${item.revenue.toFixed(2)}</span>
+                                                </div>
+                                                {item.userId === user?.uid && (
+                                                    <button
+                                                        onClick={() => handleDeletePost(item.id)}
+                                                        disabled={deletingPostId === item.id}
+                                                        className="p-2.5 bg-rose-50 text-rose-500 rounded-xl border border-rose-100 hover:bg-rose-100 transition-colors disabled:opacity-50"
+                                                        title="Eliminar publicación"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-3xl border border-slate-100/50 group-hover:bg-indigo-50/30 group-hover:border-indigo-100/50 transition-colors">
+                                                <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0">
+                                                    <Package size={20} className="text-indigo-500" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs uppercase tracking-widest font-black text-slate-400 leading-none mb-2">Product</p>
+                                                    <p className="text-lg font-bold text-slate-700 truncate leading-tight">{item.product}</p>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2 shadow-sm">
-                                            <TrendingUp size={16} strokeWidth={3} />
-                                            <span className="font-black text-sm">${item.revenue.toFixed(2)}</span>
-                                        </div>
-                                        {isGroupCreator && (
-                                            <button
-                                                onClick={() => handleDeletePost(item.id)}
-                                                disabled={deletingPostId === item.id}
-                                                className="p-2.5 bg-rose-50 text-rose-500 rounded-xl border border-rose-100 hover:bg-rose-100 transition-colors disabled:opacity-50"
-                                                title="Eliminar publicación"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </div>
 
-                                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-3xl border border-slate-100/50 group-hover:bg-indigo-50/30 group-hover:border-indigo-100/50 transition-colors">
-                                        <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0">
-                                            <Package size={20} className="text-indigo-500" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs uppercase tracking-widest font-black text-slate-400 leading-none mb-2">Product</p>
-                                            <p className="text-lg font-bold text-slate-700 truncate leading-tight">{item.product}</p>
-                                        </div>
-                                    </div>
+                                            <div className="flex flex-wrap items-center gap-2 mt-4">
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={() => setShowStatusMenu(showStatusMenu === item.id ? null : item.id)}
+                                                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all flex items-center gap-1 ${currentStatus.color
+                                                            } ${updatingStatusId === item.id ? 'opacity-50 animate-pulse' : 'hover:scale-105 active:scale-95'}`}
+                                                    >
+                                                        {currentStatus.icon}
+                                                        {currentStatus.label}
+                                                        <ChevronDown size={10} className={`transition-transform ${showStatusMenu === item.id ? 'rotate-180' : ''}`} />
+                                                    </button>
 
-                                    <div className="flex flex-wrap items-center gap-2 mt-4">
-                                        <div className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border flex items-center ${currentStatus.color}`}>
-                                            {currentStatus.icon}
-                                            {currentStatus.label}
-                                        </div>
+                                                    {showStatusMenu === item.id && (
+                                                        <>
+                                                            <div
+                                                                className="fixed inset-0 z-10"
+                                                                onClick={() => setShowStatusMenu(null)}
+                                                            />
+                                                            <div className="absolute bottom-full left-0 mb-2 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 py-2 animate-in fade-in zoom-in-95 duration-200">
+                                                                {Object.entries(statusConfig).map(([key, config]) => (
+                                                                    <button
+                                                                        key={key}
+                                                                        onClick={() => handleUpdatePostStatus(item.id, key)}
+                                                                        className="w-full px-4 py-2 text-left hover:bg-slate-50 flex items-center transition-colors"
+                                                                    >
+                                                                        <span className={`w-2 h-2 rounded-full mr-3 ${config.color.split(' ')[0]}`} />
+                                                                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                            {config.label}
+                                                                        </span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
 
-                                        {item.clientName && (
-                                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100/50">
-                                                <User size={12} />
-                                                <span className="text-[11px] font-bold">{item.clientName}</span>
+                                                <button
+                                                    onClick={() => handleToggleCall(item.id, item.callingByUserId)}
+                                                    className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border flex items-center transition-all ${item.callingByUserId
+                                                        ? item.callingByUserId === user?.uid
+                                                            ? "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
+                                                            : "bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed"
+                                                        : "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100"
+                                                        }`}
+                                                >
+                                                    {item.callingByUserId ? (
+                                                        item.callingByUserId === user?.uid ? (
+                                                            <>
+                                                                <PhoneOff size={11} className="mr-1.5" />
+                                                                Llamada pendiente por mí
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Phone size={11} className="mr-1.5" />
+                                                                Llamada por: {item.callingByUserName}
+                                                            </>
+                                                        )
+                                                    ) : (
+                                                        <>
+                                                            <Phone size={11} className="mr-1.5" />
+                                                            Escojer para llamar
+                                                        </>
+                                                    )}
+                                                </button>
+
+                                                {item.clientName && (
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100/50">
+                                                        <User size={12} />
+                                                        <span className="text-[11px] font-bold">{item.clientName}</span>
+                                                    </div>
+                                                )}
+
+                                                {item.accountNumber && (
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg border border-slate-100">
+                                                        <Hash size={12} />
+                                                        <span className="text-[11px] font-bold">{item.accountNumber}</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-
-                                        {item.accountNumber && (
-                                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg border border-slate-100">
-                                                <Hash size={12} />
-                                                <span className="text-[11px] font-bold">{item.accountNumber}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                        </div>
                                     );
                                 })()
                             ))
@@ -502,20 +637,20 @@ export const GroupPage = () => {
                             <div className="relative z-10">
                                 <h3 className="text-xl font-black mb-2">Sobre el grupo</h3>
                                 <p className="text-indigo-100 text-sm font-medium leading-relaxed mb-6">
-                                    Este es un espacio dedicado para los miembros de <span className="text-white font-bold">{groupName}</span>. 
-                                   
+                                    Este es un espacio dedicado para los miembros de <span className="text-white font-bold">{groupName}</span>.
+
                                 </p>
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between py-3 border-b border-white/10">
                                         <span className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Publicaciones</span>
                                         <span className="font-black text-xl">{publications.length}</span>
                                     </div>
-                                    
+
                                 </div>
                             </div>
                         </div>
 
-                        
+
                     </div>
                 </div>
             </div>

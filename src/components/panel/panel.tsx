@@ -6,7 +6,7 @@ import { Table } from "./table/table";
 import { useAuth } from "./auth/authContext";
 import ProfileModal from "./auth/ProfileModal";
 import { Link } from "react-router-dom"
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useEffect, useState, useCallback } from "react";
 import { RankingComponente } from "./ranking/rankingComponente";
@@ -19,6 +19,7 @@ export default function PanelVentas() {
   const [openMenu, setOpenMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [pendingChallenges, setPendingChallenges] = useState<any[]>([]);
+  const [hasUnseenGroupPosts, setHasUnseenGroupPosts] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     displayName: "",
@@ -174,6 +175,41 @@ export default function PanelVentas() {
     return () => unsubscribe();
   }, [user]);
 
+  // Listen for unseen group posts to show red dot on Data History nav
+  useEffect(() => {
+    if (!user) return;
+
+    // Listen to user's lastSeenGroups
+    const userRef = doc(db, "users", user.uid);
+    let lastSeenGroups: Record<string, any> = {};
+
+    const userUnsub = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        lastSeenGroups = docSnap.data().lastSeenGroups || {};
+      }
+    });
+
+    // Listen to all groups for lastPostAt changes
+    const groupsQuery = query(collection(db, "publications"), orderBy("createdAt", "desc"));
+    const groupsUnsub = onSnapshot(groupsQuery, (snapshot) => {
+      let hasUnseen = false;
+      snapshot.docs.forEach((groupDoc) => {
+        const data = groupDoc.data();
+        const lastPostAt = data.lastPostAt?.toMillis?.() || 0;
+        const lastSeen = lastSeenGroups[groupDoc.id]?.toMillis?.() || lastSeenGroups[groupDoc.id] || 0;
+        if (lastPostAt > lastSeen) {
+          hasUnseen = true;
+        }
+      });
+      setHasUnseenGroupPosts(hasUnseen);
+    });
+
+    return () => {
+      userUnsub();
+      groupsUnsub();
+    };
+  }, [user]);
+
   const handleAcceptChallenge = async (challengeId: string) => {
     try {
       await updateDoc(doc(db, "challenges", challengeId), { status: "accepted" });
@@ -236,11 +272,11 @@ export default function PanelVentas() {
           <div className="glass p-2.5 rounded-[2rem] flex items-center gap-2 self-start xl:self-auto shadow-2xl shadow-indigo-200/20">
             <nav className="flex items-center">
               {[
-                { to: "/data-history", icon: <BellRing size={20} />, label: "Data History" },
-                { to: "/alarm", icon: <BellRing size={20} />, label: "Call backs" },
-                { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking" },
-                { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge" },
-                { to: "/previous-months", icon: <Calendar size={20} />, label: "History" },
+                { to: "/data-history", icon: <BellRing size={20} />, label: "Data History", showDot: hasUnseenGroupPosts },
+                { to: "/alarm", icon: <BellRing size={20} />, label: "Call backs", showDot: false },
+                { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking", showDot: false },
+                { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge", showDot: false },
+                { to: "/previous-months", icon: <Calendar size={20} />, label: "History", showDot: false },
               ].map((item, index) => (
                 <Link
                   key={index}
@@ -249,6 +285,12 @@ export default function PanelVentas() {
                 >
                   <div className="relative z-10 transition-transform group-hover:-translate-y-0.5 duration-300">
                     {item.icon}
+                    {item.showDot && (
+                      <span className="absolute -top-1 -right-1.5 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white shadow-sm" />
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
                     {item.label}

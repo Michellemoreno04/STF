@@ -4,7 +4,8 @@ import Swal from 'sweetalert2';
 
 interface AlarmData {
     id: string;
-    time: string;
+    date: string; // YYYY-MM-DD
+    time: string; // HH:MM
     title: string;
     description: string;
     isActive: boolean;
@@ -12,8 +13,8 @@ interface AlarmData {
 
 interface AlarmContextType {
     alarms: AlarmData[];
-    addAlarm: (time: string, title: string, description: string) => void;
-    updateAlarm: (id: string, time: string, title: string, description: string) => void;
+    addAlarm: (date: string, time: string, title: string, description: string) => void;
+    updateAlarm: (id: string, date: string, time: string, title: string, description: string) => void;
     deleteAlarm: (id: string) => void;
     toggleActive: (id: string) => void;
     primeAudio: () => void;
@@ -36,12 +37,14 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Migration: Check for single alarm data
+        const today = new Date().toISOString().split('T')[0];
         const oldSingleAlarm = localStorage.getItem('alarmData');
         if (oldSingleAlarm) {
             try {
                 const parsed = JSON.parse(oldSingleAlarm);
                 return [{
                     id: Date.now().toString(),
+                    date: parsed.date || today,
                     time: parsed.time,
                     title: parsed.title,
                     description: parsed.description,
@@ -55,6 +58,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         if (oldTime) {
             return [{
                 id: Date.now().toString(),
+                date: today,
                 time: oldTime,
                 title: 'Recordatorio',
                 description: '',
@@ -130,9 +134,11 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
             const currentMinutes = String(now.getMinutes()).padStart(2, '0');
             const currentSeconds = now.getSeconds();
             const currentTimeString = `${currentHours}:${currentMinutes}`;
+            const currentDateString = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
             const matchedAlarm = alarms.find(a =>
                 a.isActive &&
+                a.date === currentDateString &&
                 a.time === currentTimeString &&
                 currentSeconds < 2 // 2 second window to trigger
             );
@@ -182,8 +188,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const stopAlarm = (idToDelete?: string) => {
         const id = idToDelete || ringingAlarmId;
         if (id) {
-            // Optional: Auto-disable alarm after calling?
-            // setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: false } : a));
+            // Auto-deactivate one-shot alarm after it fires
+            setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: false } : a));
         }
         setRingingAlarmId(null);
         if (audioRef.current) {
@@ -206,9 +212,10 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Public Actions
-    const addAlarm = (time: string, title: string, description: string) => {
+    const addAlarm = (date: string, time: string, title: string, description: string) => {
         const newAlarm: AlarmData = {
             id: Date.now().toString(),
+            date,
             time,
             title: title || 'Recordatorio',
             description,
@@ -218,9 +225,10 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         primeAudio();
     };
 
-    const updateAlarm = (id: string, time: string, title: string, description: string) => {
+    const updateAlarm = (id: string, date: string, time: string, title: string, description: string) => {
         setAlarms(prev => prev.map(a => a.id === id ? {
             ...a,
+            date,
             time,
             title: title || 'Recordatorio',
             description,
