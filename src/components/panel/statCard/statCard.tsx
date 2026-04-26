@@ -30,7 +30,7 @@ export const StatCards = ({ stats }: { stats: Stats }) => {
                     icon={<TrendingUp size={20} />}
                     color="text-rose-600 bg-rose-50 border-rose-100"
                     iconColor="bg-rose-500 text-white"
-                    goal="Mobile yield 5%"
+                    goal="Mobile yield 6%"
                 />
                 <StatCard
                     title="Devices"
@@ -46,7 +46,7 @@ export const StatCards = ({ stats }: { stats: Stats }) => {
                     icon={<Database size={20} />}
                     color="text-cyan-600 bg-cyan-50 border-cyan-100"
                     iconColor="bg-cyan-500 text-white"
-                    goal="Data yield 7%"
+                    goal="Data yield 8%"
                 />
                 <StatCard
                     title="Asurion"

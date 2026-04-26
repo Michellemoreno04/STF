@@ -8,10 +8,8 @@ import {
     Clock,
     TrendingUp,
     Package,
-    MessageSquare,
     Plus,
     Check,
-    Globe,
     Target,
     CheckCircle2,
     XCircle,
@@ -168,35 +166,33 @@ export const GroupPage = () => {
         }
     };
 
-    const handleUploadSale = async () => {
+    const handleAddPendingOrder = async () => {
         if (!user || !groupId) return;
 
         const { value: formValues } = await Swal.fire({
-            title: `Publicar en ${groupName}`,
+            title: `Agregar orden pendiente en ${groupName}`,
             html:
                 '<div class="flex flex-col gap-4">' +
-                '<input id="swal-product" class="swal2-input !m-0" placeholder="¿Qué vendiste?">' +
-                '<input id="swal-revenue" type="number" class="swal2-input !m-0" placeholder="Revenue ($)">' +
                 '<select id="swal-type" class="swal2-input !m-0">' +
-                '<option value="Devices">Devices</option>' +
                 '<option value="Data">Data</option>' +
-                '<option value="Line">Line</option>' +
-                '<option value="Other">Other</option>' +
+                '<option value="Mobile">Mobile</option>' +
                 '</select>' +
+                '<input id="swal-account" type="text" class="swal2-input !m-0" placeholder="Número de cuenta">' +
+                '<input id="swal-client" type="text" class="swal2-input !m-0" placeholder="Nombre del cliente">' +
                 '</div>',
             focusConfirm: false,
             showCancelButton: true,
-            confirmButtonText: 'Publicar',
-            confirmButtonColor: '#4f46e5',
+            confirmButtonText: 'Agregar',
+            confirmButtonColor: '#f59e0b',
             preConfirm: () => {
-                const prod = (document.getElementById('swal-product') as HTMLInputElement).value;
-                const rev = (document.getElementById('swal-revenue') as HTMLInputElement).value;
                 const type = (document.getElementById('swal-type') as HTMLSelectElement).value;
-                if (!prod || !rev) {
+                const account = (document.getElementById('swal-account') as HTMLInputElement).value;
+                const client = (document.getElementById('swal-client') as HTMLInputElement).value;
+                if (!account || !client) {
                     Swal.showValidationMessage('Por favor completa los campos');
                     return false;
                 }
-                return { product: prod, revenue: rev, type: type }
+                return { type: type, account: account, client: client }
             }
         });
 
@@ -206,9 +202,12 @@ export const GroupPage = () => {
                     userId: user.uid,
                     userName: user.displayName || 'Anonymous',
                     userAvatar: user.photoURL || '',
-                    product: formValues.product,
-                    revenue: parseFloat(formValues.revenue),
+                    product: `Orden Pendiente - ${formValues.type}`,
+                    revenue: 0,
                     type: formValues.type,
+                    status: 'pending',
+                    clientName: formValues.client,
+                    accountNumber: formValues.account,
                     groupId: groupId,
                     groupName: groupName,
                     timestamp: serverTimestamp()
@@ -228,17 +227,19 @@ export const GroupPage = () => {
 
                 Swal.fire({
                     icon: 'success',
-                    title: '¡Venta publicada!',
+                    title: '¡Orden agregada!',
                     timer: 1500,
                     showConfirmButton: false,
                     position: 'top-end',
                     toast: true
                 });
             } catch (error) {
-                console.error("Error publishing sale:", error);
+                console.error("Error publishing pending order:", error);
             }
         }
     };
+
+
 
     const handleDeleteGroup = async () => {
         if (!user || !groupId || !isGroupCreator || deletingGroup) return;
@@ -440,12 +441,14 @@ export const GroupPage = () => {
                             </button>
                         )}
                         <button
-                            onClick={handleUploadSale}
-                            className="p-3 bg-white text-slate-600 rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all font-bold shadow-sm active:scale-95"
-                            title="Publicar Venta"
+                            onClick={handleAddPendingOrder}
+                            className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200 hover:bg-amber-100 transition-all font-bold shadow-sm active:scale-95"
+                            title="Agregar orden pendiente"
                         >
-                            <MessageSquare size={20} />
+                            <Plus size={20} />
+                            Agregar Ordenes
                         </button>
+
                         {isGroupCreator && (
                             <button
                                 onClick={handleDeleteGroup}
@@ -476,20 +479,6 @@ export const GroupPage = () => {
                                 {[1, 2, 3].map(i => (
                                     <div key={i} className="h-40 bg-white rounded-3xl animate-pulse border border-slate-100" />
                                 ))}
-                            </div>
-                        ) : publications.length === 0 ? (
-                            <div className="text-center py-20 bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-                                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Globe size={32} className="text-slate-300" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-800 mb-2">Sin publicaciones</h3>
-                                <p className="text-slate-500 max-w-xs mx-auto">Sé el primero en compartir algo con el grupo {groupName}.</p>
-                                <button
-                                    onClick={handleUploadSale}
-                                    className="mt-6 px-6 py-3 bg-indigo-50 text-indigo-600 font-bold rounded-2xl hover:bg-indigo-100 transition-colors"
-                                >
-                                    Hacer primera publicación
-                                </button>
                             </div>
                         ) : (
                             publications.map((item) => (

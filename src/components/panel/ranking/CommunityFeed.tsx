@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { db } from "../../../firebase";
-import { MessageSquare } from "lucide-react";
 
 
 interface Publication {
@@ -20,6 +19,8 @@ interface Publication {
 export const CommunityFeed = () => {
     const [publications, setPublications] = useState<Publication[]>([]);
     const [loading, setLoading] = useState(true);
+    console.log(publications);
+
 
     useEffect(() => {
         const q = query(
@@ -53,19 +54,7 @@ export const CommunityFeed = () => {
         );
     }
 
-    if (publications.length === 0) {
-        return (
-            <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
-                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
-                    <MessageSquare size={28} className="text-slate-300" />
-                </div>
-                <div>
-                    <p className="font-medium text-slate-600">No publications yet</p>
-                    <p className="text-xs mt-1">Be the first to share a sale!</p>
-                </div>
-            </div>
-        );
-    }
+
 
 
 };

@@ -288,6 +288,11 @@ export function AlarmClock() {
                                                                     en {getTimeUntil(alarm.date, alarm.time)}
                                                                 </span>
                                                             )}
+                                                            {alarm.isActive && getTimeUntil(alarm.date, alarm.time) === 'Pasada' && (
+                                                                <span className="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-0.5 rounded-full mt-1">
+                                                                    Pendiente (Pasada)
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <p className="text-sm text-indigo-200 mt-1 font-medium truncate pr-4">
                                                             {alarm.title}

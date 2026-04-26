@@ -124,6 +124,8 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         };
     }, [ringingAlarmId, alarms]);
 
+    const lastTriggeredRef = useRef<{ id: string, time: string } | null>(null);
+
     // Alarm Checker Interval
     useEffect(() => {
         if (ringingAlarmId) return; // Don't trigger new ones if one is ringing
@@ -140,10 +142,12 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
                 a.isActive &&
                 a.date === currentDateString &&
                 a.time === currentTimeString &&
-                currentSeconds < 2 // 2 second window to trigger
+                currentSeconds < 2 && // 2 second window to trigger
+                !(lastTriggeredRef.current?.id === a.id && lastTriggeredRef.current?.time === currentTimeString)
             );
 
             if (matchedAlarm) {
+                lastTriggeredRef.current = { id: matchedAlarm.id, time: currentTimeString };
                 triggerAlarm(matchedAlarm);
             }
 
@@ -181,16 +185,13 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
             allowEscapeKey: false,
             backdrop: `rgba(79, 70, 229, 0.4)`
         }).then(() => {
-            stopAlarm(activeAlarm.id);
+            stopAlarm();
         });
     };
 
-    const stopAlarm = (idToDelete?: string) => {
-        const id = idToDelete || ringingAlarmId;
-        if (id) {
-            // Auto-deactivate one-shot alarm after it fires
-            setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: false } : a));
-        }
+    const stopAlarm = () => {
+        // Se elimina la auto-desactivación (isActive: false) para que el callback/alarma
+        // se mantenga pendiente en la lista hasta que el usuario lo elimine manualmente.
         setRingingAlarmId(null);
         if (audioRef.current) {
             audioRef.current.pause();

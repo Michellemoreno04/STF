@@ -475,10 +475,11 @@ export const DataHistory = () => {
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Grupos Disponibles</h3>
                                 <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                     {groups.map((group) => {
-                                        // Check if group has unseen posts
+                                        // Check if group has unseen posts, but only notify if it's the user's group
                                         const lastPost = group.lastPostAt?.toMillis?.() || 0;
                                         const lastSeen = lastSeenGroups[group.id]?.toMillis?.() || lastSeenGroups[group.id] || 0;
-                                        const hasUnseenPosts = lastPost > lastSeen;
+                                        const isUserGroup = userGroupId === group.id;
+                                        const hasUnseenPosts = isUserGroup && (lastPost > lastSeen);
 
                                         return (
                                             <button

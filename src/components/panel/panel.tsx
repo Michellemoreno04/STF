@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, BellRing, Radar } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, Radar, Phone, Wifi } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -175,40 +175,51 @@ export default function PanelVentas() {
     return () => unsubscribe();
   }, [user]);
 
-  // Listen for unseen group posts to show red dot on Data History nav
+  const [lastSeenGroups, setLastSeenGroups] = useState<Record<string, any>>({});
+  const [userGroupId, setUserGroupId] = useState<string | null>(null);
+  const [groupsData, setGroupsData] = useState<any[]>([]);
+
+  // Listen to user's lastSeenGroups and group membership
   useEffect(() => {
     if (!user) return;
-
-    // Listen to user's lastSeenGroups
     const userRef = doc(db, "users", user.uid);
-    let lastSeenGroups: Record<string, any> = {};
-
-    const userUnsub = onSnapshot(userRef, (docSnap) => {
+    const unsub = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
-        lastSeenGroups = docSnap.data().lastSeenGroups || {};
+        const data = docSnap.data();
+        setLastSeenGroups(data.lastSeenGroups || {});
+        setUserGroupId(data.dailyRankingGroupId || null);
       }
     });
+    return () => unsub();
+  }, [user]);
 
-    // Listen to all groups for lastPostAt changes
+  // Listen to all groups
+  useEffect(() => {
+    if (!user) return;
     const groupsQuery = query(collection(db, "publications"), orderBy("createdAt", "desc"));
-    const groupsUnsub = onSnapshot(groupsQuery, (snapshot) => {
-      let hasUnseen = false;
-      snapshot.docs.forEach((groupDoc) => {
-        const data = groupDoc.data();
-        const lastPostAt = data.lastPostAt?.toMillis?.() || 0;
-        const lastSeen = lastSeenGroups[groupDoc.id]?.toMillis?.() || lastSeenGroups[groupDoc.id] || 0;
+    const unsub = onSnapshot(groupsQuery, (snapshot) => {
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setGroupsData(docs);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Calculate if there are unseen posts in the user's active group
+  useEffect(() => {
+    let hasUnseen = false;
+    groupsData.forEach((group) => {
+      const isUserGroup = userGroupId === group.id;
+      // Only show notifications for the group the user is a member of
+      if (isUserGroup) {
+        const lastPostAt = group.lastPostAt?.toMillis?.() || 0;
+        const lastSeen = lastSeenGroups[group.id]?.toMillis?.() || lastSeenGroups[group.id] || 0;
         if (lastPostAt > lastSeen) {
           hasUnseen = true;
         }
-      });
-      setHasUnseenGroupPosts(hasUnseen);
+      }
     });
-
-    return () => {
-      userUnsub();
-      groupsUnsub();
-    };
-  }, [user]);
+    setHasUnseenGroupPosts(hasUnseen);
+  }, [groupsData, lastSeenGroups, userGroupId]);
 
   const handleAcceptChallenge = async (challengeId: string) => {
     try {
@@ -272,10 +283,10 @@ export default function PanelVentas() {
           <div className="glass p-2.5 rounded-[2rem] flex items-center gap-2 self-start xl:self-auto shadow-2xl shadow-indigo-200/20">
             <nav className="flex items-center">
               {[
-                { to: "/data-history", icon: <BellRing size={20} />, label: "Data History", showDot: hasUnseenGroupPosts },
-                { to: "/alarm", icon: <BellRing size={20} />, label: "Call backs", showDot: false },
+                { to: "/data-history", icon: <Wifi size={20} />, label: "Data History", showDot: hasUnseenGroupPosts },
+                { to: "/alarm", icon: <Phone size={20} />, label: "Call backs", showDot: false },
                 { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking", showDot: false },
-                { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge", showDot: false },
+                { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge a Friend", showDot: false },
                 { to: "/previous-months", icon: <Calendar size={20} />, label: "History", showDot: false },
               ].map((item, index) => (
                 <Link
