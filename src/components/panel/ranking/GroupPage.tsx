@@ -442,7 +442,7 @@ export const GroupPage = () => {
                         )}
                         <button
                             onClick={handleAddPendingOrder}
-                            className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200 hover:bg-amber-100 transition-all font-bold shadow-sm active:scale-95"
+                            className="p-3 flex flex-row items-center justify-center gap-2 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200 hover:bg-amber-100 transition-all font-bold shadow-sm active:scale-95"
                             title="Agregar orden pendiente"
                         >
                             <Plus size={20} />

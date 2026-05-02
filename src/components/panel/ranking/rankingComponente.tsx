@@ -16,6 +16,7 @@ export const RankingComponente = () => {
     const [users, setUsers] = useState<RankingUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [queryText, setQueryText] = useState('');
+    const [visibleCount, setVisibleCount] = useState(15);
 
     useEffect(() => {
         const fetchRankingData = async () => {
@@ -99,7 +100,7 @@ export const RankingComponente = () => {
     }
 
     return (
-        <div className="glass-card w-full h-full flex flex-col p-6 overflow-hidden">
+        <div className="glass-card w-full h-[800px] flex flex-col p-6 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
@@ -139,7 +140,7 @@ export const RankingComponente = () => {
                             </div>
                         </div>
                     ) : (
-                        filteredUsers.map((user, index) => (
+                        filteredUsers.slice(0, visibleCount).map((user, index) => (
                             <div
                                 key={user.id}
                                 className={`
@@ -194,6 +195,15 @@ export const RankingComponente = () => {
                                 </div>
                             </div>
                         ))
+                    )}
+
+                    {filteredUsers.length > visibleCount && (
+                        <button
+                            onClick={() => setVisibleCount(prev => prev + 15)}
+                            className="w-full mt-2 mb-4 py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 font-bold text-sm hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/30 transition-all duration-300 flex items-center justify-center gap-2"
+                        >
+                            Cargar más usuarios
+                        </button>
                     )}
                 </div>
             </div>

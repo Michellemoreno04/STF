@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import alarmSound from '../../../assets/sounds/alarm.mp3';
 import Swal from 'sweetalert2';
+import { useAuth } from '../auth/authContext';
+import { db } from '../../../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AlarmData {
     id: string;
@@ -24,6 +27,9 @@ interface AlarmContextType {
 const AlarmContext = createContext<AlarmContextType | undefined>(undefined);
 
 export function AlarmProvider({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth();
+    const [isLoadedFromDB, setIsLoadedFromDB] = useState(false);
+
     // State for multiple alarms
     const [alarms, setAlarms] = useState<AlarmData[]>(() => {
         const saved = localStorage.getItem('alarmsData');
@@ -72,6 +78,38 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [ringingAlarmId, setRingingAlarmId] = useState<string | null>(null);
 
+    // Fetch alarms from Firebase
+    useEffect(() => {
+        if (!user) {
+            setIsLoadedFromDB(false);
+            return;
+        }
+
+        const fetchAlarms = async () => {
+            try {
+                const alarmRef = doc(db, 'userAlarms', user.uid);
+                const docSnap = await getDoc(alarmRef);
+                
+                if (docSnap.exists()) {
+                    const dbAlarms = docSnap.data().alarms || [];
+                    setAlarms(dbAlarms);
+                } else {
+                    // First time: if we have local alarms, save them to DB
+                    if (alarms.length > 0) {
+                        await setDoc(alarmRef, { alarms });
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching alarms from DB:", error);
+            } finally {
+                setIsLoadedFromDB(true);
+            }
+        };
+
+        fetchAlarms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]);
+
     // Audio Initialization
     useEffect(() => {
         audioRef.current = new Audio(alarmSound);
@@ -97,10 +135,15 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Save alarms to local storage whenever they change
+    // Save alarms to local storage and Firebase whenever they change
     useEffect(() => {
         localStorage.setItem('alarmsData', JSON.stringify(alarms));
-    }, [alarms]);
+        
+        if (user && isLoadedFromDB) {
+            const alarmRef = doc(db, 'userAlarms', user.uid);
+            setDoc(alarmRef, { alarms }).catch(e => console.error("Error saving alarms to DB", e));
+        }
+    }, [alarms, user, isLoadedFromDB]);
 
     // Update document title when alarm is ringing
     useEffect(() => {

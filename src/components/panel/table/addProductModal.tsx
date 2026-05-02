@@ -235,8 +235,10 @@ export default function ModalAddProducts({
 
       await addDoc(collection(db, "users", user.uid, "products"), productData);
       
-      // Guardar en dataHistory para tener un registro histórico de todas las transacciones
-      await addDoc(collection(db, "users", user.uid, "dataHistory"), productData);
+      // Guardar en dataHistory para tener un registro histórico solo cuando se agrega Data add
+      if (selectedOptions.includes("internet")) {
+        await addDoc(collection(db, "users", user.uid, "dataHistory"), productData);
+      }
 
       // Add total revenue to stats if applicable
       if (totalRevenueVal > 0) {
