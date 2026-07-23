@@ -1,10 +1,11 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, Radar, Phone, Wifi } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, Radar, Phone, Wifi, BadgeDollarSign } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
 import { Table } from "./table/table";
 import { useAuth } from "./auth/authContext";
 import ProfileModal from "./auth/ProfileModal";
+import CommissionSettings from "./commissions/CommissionSettings";
 import { Link } from "react-router-dom"
 import { doc, getDoc, collection, query, where, onSnapshot, updateDoc, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -21,6 +22,7 @@ export default function PanelVentas() {
   const [pendingChallenges, setPendingChallenges] = useState<any[]>([]);
   const [hasUnseenGroupPosts, setHasUnseenGroupPosts] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isCommissionSettingsOpen, setIsCommissionSettingsOpen] = useState(false);
   const [userInfo, setUserInfo] = useState({
     displayName: "",
     email: "",
@@ -35,6 +37,7 @@ export default function PanelVentas() {
     tv: 0,
     revenue: 0,
     phone: 0,
+    selfInstall: 0,
     dailyRevenue: 0,
     dailyLines: 0,
     dailyData: 0,
@@ -42,6 +45,8 @@ export default function PanelVentas() {
     dailyAsurion: 0,
     dailyTv: 0,
     dailyPhone: 0,
+    commission: 0,
+    dailyCommission: 0,
   });
 
   const fetchStats = useCallback(async () => {
@@ -61,6 +66,7 @@ export default function PanelVentas() {
     let dailyAsurion = 0;
     let dailyTv = 0;
     let dailyPhone = 0;
+    let dailyCommission = 0;
     try {
       const dailySnap = await getDoc(dailyRef);
       if (dailySnap.exists()) {
@@ -72,6 +78,7 @@ export default function PanelVentas() {
         dailyAsurion = dData.asurion || 0;
         dailyTv = dData.tv || 0;
         dailyPhone = dData.phone || 0;
+        dailyCommission = dData.commission || 0;
       }
     } catch (error) {
       console.error("Error fetching daily revenue:", error);
@@ -90,6 +97,7 @@ export default function PanelVentas() {
           tv: data.totalTv || 0,
           revenue: data.totalRevenue || 0,
           phone: data.totalPhone || 0,
+          selfInstall: data.totalSelfInstall || 0,
           dailyRevenue: dailyRev || 0,
           dailyLines: dailyLines || 0,
           dailyData: dailyData || 0,
@@ -97,6 +105,8 @@ export default function PanelVentas() {
           dailyAsurion: dailyAsurion || 0,
           dailyTv: dailyTv || 0,
           dailyPhone: dailyPhone || 0,
+          commission: data.totalCommission || 0,
+          dailyCommission: dailyCommission || 0,
         });
       } else {
         setStats({
@@ -107,6 +117,7 @@ export default function PanelVentas() {
           tv: 0,
           revenue: 0,
           phone: 0,
+          selfInstall: 0,
           dailyRevenue: dailyRev || 0,
           dailyLines: dailyLines || 0,
           dailyData: dailyData || 0,
@@ -114,6 +125,8 @@ export default function PanelVentas() {
           dailyAsurion: dailyAsurion || 0,
           dailyTv: dailyTv || 0,
           dailyPhone: dailyPhone || 0,
+          commission: 0,
+          dailyCommission: dailyCommission || 0,
         });
       }
     } catch (error) {
@@ -283,7 +296,7 @@ export default function PanelVentas() {
           <div className="glass p-2.5 rounded-[2rem] flex items-center gap-2 self-start xl:self-auto shadow-2xl shadow-indigo-200/20">
             <nav className="flex items-center">
               {[
-                { to: "/data-history", icon: <Wifi size={20} />, label: "Data History", showDot: hasUnseenGroupPosts },
+
                 { to: "/alarm", icon: <Phone size={20} />, label: "Call backs", showDot: false },
                 { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking", showDot: false },
                 { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge a Friend", showDot: false },
@@ -309,6 +322,18 @@ export default function PanelVentas() {
                 </Link>
               ))}
             </nav>
+
+            {/* Commission Settings button */}
+            <button
+              onClick={() => setIsCommissionSettingsOpen(true)}
+              className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl text-slate-500 hover:text-emerald-600 hover:bg-white transition-all duration-300 group relative overflow-hidden cursor-pointer"
+              title="Commission Settings"
+            >
+              <BadgeDollarSign size={20} className="transition-transform group-hover:-translate-y-0.5 duration-300" />
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
+                Commission
+              </span>
+            </button>
 
             <div className="w-px h-10 bg-slate-200 mx-1"></div>
 
@@ -453,13 +478,17 @@ export default function PanelVentas() {
             isOpen={isProfileModalOpen}
             onClose={() => setIsProfileModalOpen(false)}
           />
+          <CommissionSettings
+            isOpen={isCommissionSettingsOpen}
+            onClose={() => setIsCommissionSettingsOpen(false)}
+          />
         </header>
 
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* Left column: Stats */}
           <div className="lg:col-span-3 space-y-6 relative z-20">
-            <StatCards stats={stats} />
+            <StatCards stats={stats} onStatsUpdated={fetchStats} />
           </div>
 
 
