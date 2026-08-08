@@ -8,7 +8,8 @@ import Swal from "sweetalert2";
 import { addDoc, collection, doc, setDoc, increment, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
-import type { CommissionRates } from "../commissions/CommissionSettings";
+import { loadCommissionTable, loadUserTier, buildFlatRates } from "../commissions/commissionUtils";
+import type { FlatRates } from "../commissions/commissionUtils";
 
 interface Option {
   id: string;
@@ -37,20 +38,8 @@ interface Sale {
   cantidad: number;
   precioUnitario: number;
   revenue: number;
-  commission: number;
+  commission?: number;
   hora: string;
-}
-
-// ----- helpers -----
-
-async function loadRatesFromFirestore(uid: string): Promise<CommissionRates | null> {
-  try {
-    const snap = await getDoc(doc(db, "users", uid, "settings", "commissions"));
-    if (snap.exists()) return snap.data() as CommissionRates;
-  } catch (e) {
-    console.error("loadRates:", e);
-  }
-  return null;
 }
 
 // ----- component -----
@@ -72,9 +61,9 @@ export default function ModalAddProducts({
   const [globalRevenue, setGlobalRevenue] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // commission rates — loaded from Firestore
-  // Keys: "lines" | "devices" | "asurion" | "tv" | "revenue" | "Phone" | "internet_100mbps" etc.
+  // commission rates resolved from the new CommissionsPage table
   const [rateFields, setRateFields] = useState<Record<string, string>>({});
+  //const [userTier, setUserTier] = useState<"tier1" | "tier2">("tier1");
 
   // ----- open / close -----
 
@@ -93,23 +82,29 @@ export default function ModalAddProducts({
     setRateFields({});
   };
 
-  // Load rates whenever modal opens
+  // Load rates from the new CommissionsPage table whenever modal opens
   useEffect(() => {
     if (isModalOpen && user) {
-      loadRatesFromFirestore(user.uid).then((saved) => {
-        if (!saved) return;
-        const flat: Record<string, string> = {};
+      Promise.all([
+        loadCommissionTable(user.uid),
+        loadUserTier(user.uid),
+      ]).then(([tableData, tier]) => {
+        //setUserTier(tier);
+        const flat: FlatRates = buildFlatRates(tableData, tier);
+        const rateMap: Record<string, string> = {};
         // simple fields
-        (["lines", "devices", "asurion", "tv", "revenue", "Phone", "selfInstall"] as const).forEach((k) => {
-          if (saved[k] != null && saved[k] > 0) flat[k] = saved[k].toString();
-        });
+        rateMap["lines"] = flat.lines > 0 ? flat.lines.toString() : "";
+        rateMap["devices"] = flat.devices > 0 ? flat.devices.toString() : "";
+        rateMap["asurion"] = flat.asurion > 0 ? flat.asurion.toString() : "";
+        rateMap["tv"] = flat.tv > 0 ? flat.tv.toString() : "";
+        rateMap["revenue"] = flat.revenue > 0 ? flat.revenue.toString() : "";
+        rateMap["Phone"] = flat.Phone > 0 ? flat.Phone.toString() : "";
+        rateMap["selfInstall"] = flat.selfInstall > 0 ? flat.selfInstall.toString() : "";
         // internet speeds
-        if (saved.internet) {
-          Object.entries(saved.internet).forEach(([speed, val]) => {
-            if (val > 0) flat[`internet_${speed}`] = val.toString();
-          });
-        }
-        setRateFields(flat);
+        Object.entries(flat.internet).forEach(([speed, val]) => {
+          if (val > 0) rateMap[`internet_${speed}`] = val.toString();
+        });
+        setRateFields(rateMap);
       });
     }
   }, [isModalOpen, user]);
@@ -422,131 +417,157 @@ export default function ModalAddProducts({
 
               <div className="p-6 md:p-8 overflow-y-auto flex-1">
                 {/* 1. Selection Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {options.map((opt) => {
-                  const isSelected = selectedOptions.includes(opt.id);
-                  return (
-                    <div
-                      key={opt.id}
-                      className={`cursor-pointer rounded-2xl border p-3 flex flex-col items-center justify-center gap-2 text-center transition-all duration-200 ${
-                        isSelected
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {options.map((opt) => {
+                    const isSelected = selectedOptions.includes(opt.id);
+                    return (
+                      <div
+                        key={opt.id}
+                        className={`cursor-pointer rounded-2xl border p-3 flex flex-col items-center justify-center gap-2 text-center transition-all duration-200 ${isSelected
                           ? "border-indigo-500 bg-indigo-50 shadow-md ring-1 ring-indigo-500"
                           : "border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-white"
-                      }`}
-                      onClick={() => toggleInput(opt.id)}
-                    >
-                      <div className={`p-2 rounded-xl ${isSelected ? "bg-white text-indigo-600" : "bg-white shadow-sm text-slate-500"}`}>
-                        {opt.icon}
-                      </div>
-                      <span className={`text-xs font-bold ${isSelected ? "text-indigo-900" : "text-slate-600"}`}>
-                        {opt.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 2. Configuration for Selected Options */}
-              {selectedOptions.length > 0 && (
-                <div className="mt-8 space-y-4 border-t border-slate-100 pt-6">
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 px-1">
-                    Configurar Productos Seleccionados
-                  </h3>
-                  
-                  {selectedOptions.map((optId) => {
-                    const opt = options.find((o) => o.id === optId);
-                    if (!opt) return null;
-                    
-                    return (
-                      <div key={opt.id} className="p-5 rounded-2xl border border-indigo-100 bg-indigo-50/30 animate-in slide-in-from-bottom-2 duration-300">
-                        <div className="flex items-center gap-3 mb-4 border-b border-indigo-100/50 pb-3">
-                          <div className="p-2 bg-white rounded-xl shadow-sm">
-                            {opt.icon}
-                          </div>
-                          <span className="font-bold text-indigo-900 text-lg">{opt.label}</span>
+                          }`}
+                        onClick={() => toggleInput(opt.id)}
+                      >
+                        <div className={`p-2 rounded-xl ${isSelected ? "bg-white text-indigo-600" : "bg-white shadow-sm text-slate-500"}`}>
+                          {opt.icon}
                         </div>
-                        
-                        <div>
-                          {/* Lines & Devices: quantity */}
-                          {(opt.id === "lines" || opt.id === "devices") && (
-                            <>
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <select
-                                  value={values[opt.id] || ""}
-                                  onChange={(e) => handleChange(opt.id, e.target.value)}
-                                  className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
-                                >
-                                  <option value="">Select quantity</option>
-                                  {[1, 2, 3, 4, 5].map((n) => (
-                                    <option key={n} value={n}>{n}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </>
-                          )}
-
-                          {/* Data Add: speed selector */}
-                          {opt.id === "internet" && (
-                            <div className="flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="grid grid-cols-2 gap-2">
-                                {internetSpeeds.map((s) => {
-                                  const isSelectedSpeed = values[opt.id] === s;
-                                  const commissionRate = rateFields[`internet_${s}`] || "0";
-                                  return (
-                                    <button
-                                      key={s}
-                                      onClick={() => handleChange(opt.id, s)}
-                                      className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left ${
-                                        isSelectedSpeed
-                                          ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500"
-                                          : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
-                                      }`}
-                                    >
-                                      <span className={`font-semibold text-sm ${isSelectedSpeed ? "text-indigo-900" : "text-slate-700"}`}>
-                                        {s}
-                                      </span>
-                                      <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-1">
-                                        <BadgeDollarSign size={12} />
-                                        Comisión: ${commissionRate ? parseFloat(commissionRate).toFixed(2) : "0.00"}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Asurion */}
-                          {opt.id === "data" && (
-                            <>
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <select
-                                  value={values[opt.id] || ""}
-                                  onChange={(e) => handleChange(opt.id, e.target.value)}
-                                  className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
-                                >
-                                  <option value="" disabled>Select plan</option>
-                                  {["Total Care", "Max", "Plus", "Heps", "Pp&s"].map((p) => (
-                                    <option key={p} value={p}>{p}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <span className={`text-xs font-bold ${isSelected ? "text-indigo-900" : "text-slate-600"}`}>
+                          {opt.label}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-              )}
 
-              {/* Revenue + commission summary */}
-              {selectedOptions.length > 0 && (
-                <div className="mt-6 space-y-3">
-                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-2">
-                    <label className="block text-sm font-semibold text-indigo-900 mb-2">
-                      Total Revenue
-                    </label>
+                {/* 2. Configuration for Selected Options */}
+                {selectedOptions.length > 0 && (
+                  <div className="mt-8 space-y-4 border-t border-slate-100 pt-6">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 px-1">
+                      Configurar Productos Seleccionados
+                    </h3>
+
+                    {selectedOptions.map((optId) => {
+                      const opt = options.find((o) => o.id === optId);
+                      if (!opt) return null;
+
+                      return (
+                        <div key={opt.id} className="p-5 rounded-2xl border border-indigo-100 bg-indigo-50/30 animate-in slide-in-from-bottom-2 duration-300">
+                          <div className="flex items-center gap-3 mb-4 border-b border-indigo-100/50 pb-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm">
+                              {opt.icon}
+                            </div>
+                            <span className="font-bold text-indigo-900 text-lg">{opt.label}</span>
+                          </div>
+
+                          <div>
+                            {/* Lines & Devices: quantity */}
+                            {(opt.id === "lines" || opt.id === "devices") && (
+                              <>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <select
+                                    value={values[opt.id] || ""}
+                                    onChange={(e) => handleChange(opt.id, e.target.value)}
+                                    className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
+                                  >
+                                    <option value="">Select quantity</option>
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                      <option key={n} value={n}>{n}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
+
+                            {/* Data Add: speed selector */}
+                            {opt.id === "internet" && (
+                              <div className="flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {internetSpeeds.map((s) => {
+                                    const isSelectedSpeed = values[opt.id] === s;
+                                    const commissionRate = rateFields[`internet_${s}`] || "0";
+                                    return (
+                                      <button
+                                        key={s}
+                                        onClick={() => handleChange(opt.id, s)}
+                                        className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left ${isSelectedSpeed
+                                          ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500"
+                                          : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
+                                          }`}
+                                      >
+                                        <span className={`font-semibold text-sm ${isSelectedSpeed ? "text-indigo-900" : "text-slate-700"}`}>
+                                          {s}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-1">
+                                          <BadgeDollarSign size={12} />
+                                          Comisión: ${commissionRate ? parseFloat(commissionRate).toFixed(2) : "0.00"}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Asurion */}
+                            {opt.id === "data" && (
+                              <>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <select
+                                    value={values[opt.id] || ""}
+                                    onChange={(e) => handleChange(opt.id, e.target.value)}
+                                    className="w-full rounded-xl border border-indigo-200 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800"
+                                  >
+                                    <option value="" disabled>Select plan</option>
+                                    {["Total Care", "Max", "Plus", "Heps", "Pp&s"].map((p) => (
+                                      <option key={p} value={p}>{p}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Revenue + commission summary */}
+                {selectedOptions.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in slide-in-from-bottom-2">
+                      <label className="block text-sm font-semibold text-indigo-900 mb-2">
+                        Total Revenue
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={globalRevenue}
+                          onChange={(e) => setGlobalRevenue(e.target.value)}
+                          className="w-full rounded-xl border border-indigo-200 pl-8 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {tc > 0 && (
+                      <div className="flex items-center justify-between px-5 py-3 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in duration-200">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                          <BadgeDollarSign size={16} className="text-emerald-500" />
+                          Commission for this sale
+                        </span>
+                        <span className="text-lg font-bold text-emerald-600">${tc.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit mode */}
+                {editingSale && (
+                  <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                    <label className="block text-sm font-semibold text-indigo-900 mb-2">Revenue</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-bold">$</span>
                       <input
@@ -558,35 +579,7 @@ export default function ModalAddProducts({
                       />
                     </div>
                   </div>
-
-                  {tc > 0 && (
-                    <div className="flex items-center justify-between px-5 py-3 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in fade-in duration-200">
-                      <span className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                        <BadgeDollarSign size={16} className="text-emerald-500" />
-                        Commission for this sale
-                      </span>
-                      <span className="text-lg font-bold text-emerald-600">${tc.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Edit mode */}
-              {editingSale && (
-                <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                  <label className="block text-sm font-semibold text-indigo-900 mb-2">Revenue</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={globalRevenue}
-                      onChange={(e) => setGlobalRevenue(e.target.value)}
-                      className="w-full rounded-xl border border-indigo-200 pl-8 p-3 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 bg-white text-slate-800 font-medium"
-                    />
-                  </div>
-                </div>
-              )}
+                )}
 
               </div>
 

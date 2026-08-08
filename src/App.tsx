@@ -14,6 +14,7 @@ import { PassMonth } from './components/panel/statCard/previousMonths'
 import { AlarmClock } from './components/panel/alarm/AlarmClock'
 import DataHistory from './components/panel/dataHistory/dataHistory'
 import { GroupPage } from './components/panel/ranking/GroupPage'
+import CommissionsPage from './components/panel/commissions/CommissionsPage'
 
 
 function App() {
@@ -88,6 +89,7 @@ function Router() {
       <Route path="/data-history" element={<DataHistory />} />
       <Route path="/group/:groupId" element={<GroupPage />} />
       <Route path="/alarm" element={<AlarmClock />} />
+      <Route path="/commissions" element={<CommissionsPage />} />
     </Routes>
   )
 }

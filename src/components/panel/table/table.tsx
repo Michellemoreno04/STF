@@ -22,6 +22,7 @@ type Sale = {
     precioUnitario: number;
     revenue: number;
     hora: string;
+    commission?: number;
 
 };
 
