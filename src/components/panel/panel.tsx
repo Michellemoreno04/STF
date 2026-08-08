@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, Radar, Phone, BadgeDollarSign } from "lucide-react";
+import { CircleUserRound, LogOut, UserCog, ChevronDown, Bell, Calendar, Trophy, Radar, Phone, BadgeDollarSign, ClipboardList } from "lucide-react";
 
 
 import { StatCards } from "./statCard/statCard";
@@ -299,6 +299,7 @@ export default function PanelVentas() {
                 { to: "/daily-ranking", icon: <Radar size={20} />, label: "Ranking", showDot: false },
                 { to: "/challenge", icon: <Trophy size={20} />, label: "Challenge a Friend", showDot: false },
                 { to: "/previous-months", icon: <Calendar size={20} />, label: "History", showDot: false },
+                { to: "/pending-installs", icon: <ClipboardList size={20} />, label: "Pending Installs", showDot: false },
               ].map((item, index) => (
                 <Link
                   key={index}

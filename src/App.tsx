@@ -15,6 +15,7 @@ import { AlarmClock } from './components/panel/alarm/AlarmClock'
 import DataHistory from './components/panel/dataHistory/dataHistory'
 import { GroupPage } from './components/panel/ranking/GroupPage'
 import CommissionsPage from './components/panel/commissions/CommissionsPage'
+import PendingInstallsPage from './components/panel/pendingInstalls/PendingInstallsPage'
 
 
 function App() {
@@ -90,6 +91,7 @@ function Router() {
       <Route path="/group/:groupId" element={<GroupPage />} />
       <Route path="/alarm" element={<AlarmClock />} />
       <Route path="/commissions" element={<CommissionsPage />} />
+      <Route path="/pending-installs" element={<PendingInstallsPage />} />
     </Routes>
   )
 }

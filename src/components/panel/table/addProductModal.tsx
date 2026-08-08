@@ -5,7 +5,7 @@ import {
   Shield, RadioTower, SquarePen, BadgeDollarSign, Wrench
 } from "lucide-react";
 import Swal from "sweetalert2";
-import { addDoc, collection, doc, setDoc, increment, updateDoc, getDoc } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc, increment, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { useAuth } from "../auth/authContext";
 import { loadCommissionTable, loadUserTier, buildFlatRates } from "../commissions/commissionUtils";
@@ -61,8 +61,13 @@ export default function ModalAddProducts({
   const [globalRevenue, setGlobalRevenue] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Data Add: account tracking
+  const [accountNumber, setAccountNumber] = useState<string>("");
+  const [accountStatus, setAccountStatus] = useState<string>("pending_install");
+  const [installDateTime, setInstallDateTime] = useState<string>("");
+
   // commission rates resolved from the new CommissionsPage table
-  const [rateFields, setRateFields] = useState<Record<string, string>>({});
+  const [rateFields, setRateFields] = useState<Record<string, string>>();
   //const [userTier, setUserTier] = useState<"tier1" | "tier2">("tier1");
 
   // ----- open / close -----
@@ -80,6 +85,9 @@ export default function ModalAddProducts({
     setValues({});
     setGlobalRevenue("");
     setRateFields({});
+    setAccountNumber("");
+    setAccountStatus("pending_install");
+    setInstallDateTime("");
   };
 
   // Load rates from the new CommissionsPage table whenever modal opens
@@ -128,7 +136,7 @@ export default function ModalAddProducts({
     setValues((prev) => ({ ...prev, [id]: value }));
 
   const getRate = (key: string): number => {
-    const n = parseFloat(rateFields[key] ?? "");
+    const n = parseFloat(rateFields?.[key] ?? "");
     return isNaN(n) ? 0 : n;
   };
 
@@ -285,6 +293,18 @@ export default function ModalAddProducts({
       await addDoc(collection(db, "users", user.uid, "products"), productData);
       if (selectedOptions.includes("internet")) {
         await addDoc(collection(db, "users", user.uid, "dataHistory"), productData);
+        // Save to pending_installs if account number was provided
+        if (accountNumber.trim()) {
+          await addDoc(collection(db, "users", user.uid, "pending_installs"), {
+            accountNumber: accountNumber.trim(),
+            status: accountStatus,
+            speed: values["internet"] || "",
+            date: new Date().toISOString(),
+            installDateTime: installDateTime || null,
+            createdAt: serverTimestamp(),
+            userId: user.uid,
+          });
+        }
       }
 
       if (totalRevenueVal > 0) updateObj.totalRevenue = increment(totalRevenueVal);
@@ -479,33 +499,76 @@ export default function ModalAddProducts({
                               </>
                             )}
 
-                            {/* Data Add: speed selector */}
+                            {/* Data Add: speed selector + account fields */}
                             {opt.id === "internet" && (
                               <div className="flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-4 gap-1.5">
                                   {internetSpeeds.map((s) => {
                                     const isSelectedSpeed = values[opt.id] === s;
-                                    const commissionRate = rateFields[`internet_${s}`] || "0";
+                                    const commissionRate = rateFields?.[`internet_${s}`] || "0";
                                     return (
                                       <button
                                         key={s}
                                         onClick={() => handleChange(opt.id, s)}
-                                        className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left ${isSelectedSpeed
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all duration-200 text-center ${isSelectedSpeed
                                           ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500"
                                           : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50"
                                           }`}
                                       >
-                                        <span className={`font-semibold text-sm ${isSelectedSpeed ? "text-indigo-900" : "text-slate-700"}`}>
+                                        <span className={`font-semibold text-xs ${isSelectedSpeed ? "text-indigo-900" : "text-slate-700"}`}>
                                           {s}
                                         </span>
-                                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-1">
-                                          <BadgeDollarSign size={12} />
-                                          Comisión: ${commissionRate ? parseFloat(commissionRate).toFixed(2) : "0.00"}
+                                        <span className="flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 mt-0.5">
+                                          <BadgeDollarSign size={10} />
+                                          ${commissionRate ? parseFloat(commissionRate).toFixed(0) : "0"}
                                         </span>
                                       </button>
                                     );
                                   })}
                                 </div>
+
+                                {/* Account tracking fields — only show once a speed is selected */}
+                                {values[opt.id] && (
+                                  <div className="mt-2 p-4 rounded-xl bg-purple-50 border border-purple-100 flex flex-col gap-3 animate-in slide-in-from-top-1 duration-200">
+                                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"></span>
+                                      Account Tracking
+                                    </p>
+                                    <div>
+                                      <label className="block text-xs font-semibold text-slate-600 mb-1">Account Number</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 123456789"
+                                        value={accountNumber}
+                                        maxLength={15}
+                                        onChange={(e) => setAccountNumber(e.target.value)}
+                                        className="w-full rounded-xl border border-purple-200 px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 bg-white text-slate-800 placeholder-slate-400"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-semibold text-slate-600 mb-1">Account Status</label>
+                                      <select
+                                        value={accountStatus}
+                                        onChange={(e) => setAccountStatus(e.target.value)}
+                                        className="w-full rounded-xl border border-purple-200 px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 bg-white text-slate-800"
+                                      >
+                                        <option value="pending_install">Pending Install</option>
+                                        <option value="reschedule">Reschedule</option>
+                                        <option value="cancelled">Cancelled</option>
+                                        <option value="complete">Complete</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-semibold text-slate-600 mb-1">Installation Date &amp; Time</label>
+                                      <input
+                                        type="datetime-local"
+                                        value={installDateTime}
+                                        onChange={(e) => setInstallDateTime(e.target.value)}
+                                        className="w-full rounded-xl border border-purple-200 px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 bg-white text-slate-800"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
 
