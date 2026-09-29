@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, BellRing, BellOff, Type, ArrowLeft, Plus, Save, Trash2, Volume2, CalendarDays } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
-import { useAlarm } from './AlarmContext';
+import { useAlarm, getLocalDateString } from './AlarmContext';
 
 interface AlarmData {
     id: string;
@@ -20,7 +20,7 @@ export function AlarmClock() {
     // Form State
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [inputDate, setInputDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [inputDate, setInputDate] = useState(() => getLocalDateString());
     const [inputTime, setInputTime] = useState('');
     const [inputTitle, setInputTitle] = useState('');
     const [inputDescription, setInputDescription] = useState('');
@@ -28,7 +28,7 @@ export function AlarmClock() {
     // CRUD Operations
     const handleAddNew = () => {
         setEditingId(null);
-        setInputDate(new Date().toISOString().split('T')[0]);
+        setInputDate(getLocalDateString());
         setInputTime('');
         setInputTitle('');
         setInputDescription('');
@@ -38,7 +38,7 @@ export function AlarmClock() {
 
     const handleEdit = (alarm: AlarmData) => {
         setEditingId(alarm.id);
-        setInputDate(alarm.date || new Date().toISOString().split('T')[0]);
+        setInputDate(alarm.date || getLocalDateString());
         setInputTime(alarm.time);
         setInputTitle(alarm.title);
         setInputDescription(alarm.description);
@@ -97,7 +97,7 @@ export function AlarmClock() {
     const getTimeUntil = (dateStr: string, timeStr: string) => {
         const now = new Date();
         const [hours, minutes] = timeStr.split(':').map(Number);
-        const [year, month, day] = dateStr.split('-').map(Number);
+        const [year, month, day] = (dateStr || getLocalDateString()).split('-').map(Number);
 
         const target = new Date(year, month - 1, day, hours, minutes, 0);
 
@@ -180,7 +180,7 @@ export function AlarmClock() {
                                             type="date"
                                             required
                                             value={inputDate}
-                                            min={new Date().toISOString().split('T')[0]}
+                                            min={getLocalDateString()}
                                             onChange={(e) => setInputDate(e.target.value)}
                                             className="bg-transparent border-none text-2xl font-mono font-bold text-white text-center w-full focus:outline-none focus:ring-0 p-0 [color-scheme:dark] cursor-pointer"
                                         />
@@ -266,8 +266,12 @@ export function AlarmClock() {
                                 </div>
                             ) : (
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                    {alarms
-                                        .sort((a, b) => a.time.localeCompare(b.time))
+                                    {[...alarms]
+                                        .sort((a, b) => {
+                                            const dateA = a.date || '9999-99-99';
+                                            const dateB = b.date || '9999-99-99';
+                                            return `${dateA} ${a.time}`.localeCompare(`${dateB} ${b.time}`);
+                                        })
                                         .map(alarm => (
                                             <div
                                                 key={alarm.id}

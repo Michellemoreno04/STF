@@ -26,6 +26,13 @@ interface AlarmContextType {
 
 const AlarmContext = createContext<AlarmContextType | undefined>(undefined);
 
+export const getLocalDateString = (d: Date = new Date()): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export function AlarmProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [isLoadedFromDB, setIsLoadedFromDB] = useState(false);
@@ -35,7 +42,14 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         const saved = localStorage.getItem('alarmsData');
         if (saved) {
             try {
-                return JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(a => ({
+                        ...a,
+                        date: a.date || getLocalDateString()
+                    }));
+                }
+                return [];
             } catch (e) {
                 console.error("Error parsing alarms:", e);
                 return [];
@@ -43,7 +57,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Migration: Check for single alarm data
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
         const oldSingleAlarm = localStorage.getItem('alarmData');
         if (oldSingleAlarm) {
             try {
@@ -179,7 +193,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
             const currentMinutes = String(now.getMinutes()).padStart(2, '0');
             const currentSeconds = now.getSeconds();
             const currentTimeString = `${currentHours}:${currentMinutes}`;
-            const currentDateString = now.toISOString().split('T')[0]; // YYYY-MM-DD
+            const currentDateString = getLocalDateString(now); // Local YYYY-MM-DD
 
             const matchedAlarm = alarms.find(a =>
                 a.isActive &&
